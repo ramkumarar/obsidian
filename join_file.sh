@@ -6,7 +6,7 @@ echo "Rejoining chunks into Obsidian_Restored.exe..."
 cat obsidian_chunk_*.part > Obsidian_Restored.exe
 
 if [ $? -eq 0 ]; then
-    echo "Done! File restored as Obsidian_Restored.exe"
+    echo "Done! File restored as Obsidian_Restored"
     # Optional: Verify size
     ls -lh Obsidian_Restored.exe
 else
