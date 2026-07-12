@@ -3,7 +3,7 @@
 echo "Rejoining chunks into Obsidian_Restored..."
 
 # Combines all files starting with 'obsidian_chunk_' in order
-cat obsidian_chunk_*.part > Obsidian_Restored.exe
+cat obsidian_chunk_*.part > Obsidian_Restored
 
 if [ $? -eq 0 ]; then
     echo "Done! File restored as Obsidian_Restored"
