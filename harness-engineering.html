@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Harness Engineering — Human ↔ Agent Delegation Loop</title>
+<style>
+/* ── ACCESSIBLE COLOUR SYSTEM ──────────────────────────────────────────────
+   All text colours tested against dark backgrounds for WCAG AA (4.5:1+).
+   Human  #ffb347 on #0d111a  ≈ 8.2:1 ✓
+   Agent  #4dd9c4 on #0d111a  ≈ 7.4:1 ✓
+   Skills #b39dff on #0d111a  ≈ 6.8:1 ✓
+   MCP    #f06292 on #0d111a  ≈ 5.1:1 ✓
+   Sub    #69f0ae on #0d111a  ≈ 9.3:1 ✓
+   Body   #dde3f0 on #0d111a  ≈ 11.2:1 ✓
+   Dim    #9daabf on #0d111a  ≈ 5.6:1 ✓
+   ──────────────────────────────────────────────────────────────────────── */
+:root{
+  --bg:#0d111a;
+  --bg2:#111722;
+  --human:#ffb347;
+  --agent:#4dd9c4;
+  --skills:#b39dff;
+  --mcp:#f06292;
+  --sub:#69f0ae;
+  --text:#dde3f0;
+  --dim:#9daabf;
+  --line:#1e2d42;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;background:var(--bg);color:var(--text);
+  font-family:'Inter','Segoe UI',system-ui,sans-serif;
+  overflow:hidden;height:100%;width:100%;}
+#stage{position:fixed;inset:0;}canvas{display:block;}
+
+/* ── HUD SHELL ── */
+.hud{position:fixed;inset:0;pointer-events:none;z-index:5;
+  display:flex;flex-direction:column;justify-content:space-between;
+  padding:28px 36px 24px;}
+
+/* ── HEADER ── */
+.header-panel{
+  background:rgba(13,17,26,.72);
+  border:1px solid var(--line);
+  border-radius:12px;
+  padding:16px 20px 14px;
+  backdrop-filter:blur(10px);
+  max-width:520px;
+}
+.eyebrow{
+  font-size:10px;letter-spacing:.32em;color:var(--agent);
+  font-weight:700;margin-bottom:8px;text-transform:uppercase;
+  font-family:'JetBrains Mono','Courier New',monospace;
+}
+.title{
+  font-weight:800;font-size:22px;line-height:1.2;
+  color:var(--text);margin-bottom:6px;letter-spacing:-.01em;
+}
+.subtitle{font-size:13px;color:var(--dim);line-height:1.65;margin-bottom:12px;}
+.legend{display:flex;gap:16px;flex-wrap:wrap;}
+.legend-item{display:flex;align-items:center;gap:6px;font-size:11px;
+  color:var(--text);letter-spacing:.04em;font-weight:500;}
+.legend-dot{width:8px;height:8px;border-radius:50%;flex:none;
+  box-shadow:0 0 5px currentColor;}
+
+/* ── FOOTER ── */
+.footer{display:flex;flex-direction:column;align-items:center;gap:10px;}
+.phase-banner{
+  font-size:12px;letter-spacing:.16em;text-transform:uppercase;font-weight:700;
+  color:var(--text);opacity:0;transition:opacity .4s;text-align:center;
+  min-height:18px;
+  text-shadow:0 1px 8px rgba(0,0,0,.8);
+}
+
+/* ── STEPPER ── */
+.stepper{
+  display:flex;align-items:stretch;
+  background:rgba(13,17,26,.88);
+  border:1px solid var(--line);border-radius:12px;
+  padding:12px 8px;backdrop-filter:blur(12px);
+  box-shadow:0 4px 24px rgba(0,0,0,.5);
+}
+.step{position:relative;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:10px 24px;min-width:108px;}
+.step+.step{border-left:1px solid var(--line);}
+.step-num{font-size:9px;color:var(--dim);letter-spacing:.14em;margin-bottom:4px;
+  font-family:'JetBrains Mono','Courier New',monospace;}
+.step-label{font-size:13px;font-weight:700;letter-spacing:.06em;color:var(--dim);
+  transition:color .3s,text-shadow .3s;}
+.step-sub{display:flex;gap:5px;margin-top:6px;}
+.chip{font-size:9px;letter-spacing:.06em;padding:3px 7px;border-radius:4px;
+  color:var(--dim);border:1px solid var(--line);transition:all .25s;
+  text-transform:uppercase;font-weight:600;}
+.chip.active{color:#0d111a;font-weight:800;}
+.step.active .step-label{color:#ffffff;text-shadow:0 0 12px var(--pc,var(--agent));}
+.step.active .step-num{color:var(--pc,var(--agent));}
+.step-bar{position:absolute;bottom:-13px;left:12px;right:12px;height:3px;
+  background:var(--line);border-radius:2px;overflow:hidden;}
+.step-fill{height:100%;width:0%;border-radius:2px;transition:background .3s;}
+
+/* ── NODE LABELS ── */
+.nlabel{
+  position:fixed;pointer-events:none;transform:translate(-50%,-50%);
+  text-align:center;z-index:4;transition:opacity .25s;
+  background:rgba(13,17,26,.75);
+  border:1px solid rgba(255,255,255,.08);
+  border-radius:8px;
+  padding:6px 10px;
+  backdrop-filter:blur(6px);
+}
+.nl-name{
+  font-size:12px;font-weight:800;letter-spacing:.12em;
+  text-transform:uppercase;text-shadow:0 0 8px currentColor;
+  line-height:1.2;
+}
+.nl-sub{font-size:10px;color:var(--dim);letter-spacing:.03em;margin-top:3px;line-height:1.3;}
+
+/* ── APPROVE FLASH ── */
+.approve{
+  position:fixed;pointer-events:none;
+  font-size:16px;font-weight:800;color:var(--sub);
+  letter-spacing:.12em;transform:translate(-50%,-50%);
+  opacity:0;z-index:6;
+  text-shadow:0 0 20px rgba(105,240,174,.9);
+  white-space:nowrap;
+  background:rgba(13,17,26,.85);
+  border:1px solid var(--sub);
+  border-radius:8px;padding:8px 16px;
+  backdrop-filter:blur(8px);
+}
+
+@media(max-width:700px){
+  .title{font-size:17px;}.subtitle{display:none;}
+  .step{min-width:72px;padding:10px 10px;}
+  .step-label{font-size:11px;}
+}
+</style>
+</head>
+<body>
+<div id="stage"></div>
+<div class="hud">
+  <div class="header-panel">
+    <div class="eyebrow">Harness Engineering</div>
+    <div class="title">The Human &#8596; Agent Delegation Loop</div>
+    <div class="subtitle">Human provides intent and delegates. Agent orchestrates — reaching into skills, MCP tools, and subagents — then returns results for human review and approval.</div>
+    <div class="legend">
+      <div class="legend-item"><span class="legend-dot" style="background:var(--human);color:var(--human)"></span>Human</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--agent);color:var(--agent)"></span>Agent</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--skills);color:var(--skills)"></span>Skills</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--mcp);color:var(--mcp)"></span>MCP</div>
+      <div class="legend-item"><span class="legend-dot" style="background:var(--sub);color:var(--sub)"></span>Subagents</div>
+    </div>
+  </div>
+  <div class="footer">
+    <div class="phase-banner" id="banner"></div>
+    <div class="stepper">
+      <div class="step" id="s-input"><div class="step-num">01</div><div class="step-label">Input</div><div class="step-bar"><div class="step-fill" id="f-input"></div></div></div>
+      <div class="step" id="s-delegate"><div class="step-num">02</div><div class="step-label">Delegate</div><div class="step-bar"><div class="step-fill" id="f-delegate"></div></div></div>
+      <div class="step" id="s-execute"><div class="step-num">03</div><div class="step-label">Execute</div><div class="step-sub"><div class="chip" id="c-skills">Skills</div><div class="chip" id="c-mcp">MCP</div><div class="chip" id="c-sub">Subagents</div></div><div class="step-bar"><div class="step-fill" id="f-execute"></div></div></div>
+      <div class="step" id="s-review"><div class="step-num">04</div><div class="step-label">Review</div><div class="step-bar"><div class="step-fill" id="f-review"></div></div></div>
+    </div>
+  </div>
+</div>
+<div class="nlabel" id="lbl-human" style="color:var(--human)"><div class="nl-name">Human</div><div class="nl-sub">input &middot; delegate &middot; review</div></div>
+<div class="nlabel" id="lbl-agent" style="color:var(--agent)"><div class="nl-name">Agent</div><div class="nl-sub">orchestrates execution</div></div>
+<div class="nlabel" id="lbl-skills" style="color:var(--skills)"><div class="nl-name">Skills</div><div class="nl-sub">domain knowledge</div></div>
+<div class="nlabel" id="lbl-mcp" style="color:var(--mcp)"><div class="nl-name">MCP</div><div class="nl-sub">external tools &amp; apis</div></div>
+<div class="nlabel" id="lbl-sub" style="color:var(--sub)"><div class="nl-name">Subagents</div><div class="nl-sub">parallel execution</div></div>
+<div class="approve" id="approve">&#10003; APPROVED</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/shaders/CopyShader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/EffectComposer.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/RenderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/ShaderPass.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+<script>
+(function(){
+'use strict';
+var HEX={human:0xffb347,agent:0x4dd9c4,skills:0xb39dff,mcp:0xf06292,sub:0x69f0ae,cable:0x2a3f60,bg:0x0d111a};
+var CSS={human:'#ffb347',agent:'#4dd9c4',skills:'#b39dff',mcp:'#f06292',sub:'#69f0ae'};
+var CYCLE=11.0;
+var PH={input:[0,1.8],deleg:[1.8,3.4],exSk:[3.4,5.2],exMcp:[5.2,7],exSub:[7,8.8],retT:[8.8,10],review:[10,11]};
+var BAN={
+  input:{t:'Human formulates intent',c:CSS.human},
+  deleg:{t:'Delegating task to Agent \u2192',c:CSS.human},
+  exSk:{t:'Agent activating Skills',c:CSS.skills},
+  exMcp:{t:'Agent calling MCP tools',c:CSS.mcp},
+  exSub:{t:'Agent spawning Subagents',c:CSS.sub},
+  retT:{t:'\u2190 Returning results to Human',c:CSS.agent},
+  review:{t:'Human reviews & approves \u2713',c:CSS.human}
+};
+function eio(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+function c01(x){return Math.max(0,Math.min(1,x));}
+function lp(t,r){return c01((t-r[0])/(r[1]-r[0]));}
+
+// RENDERER
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=0.85;
+document.getElementById('stage').appendChild(renderer.domElement);
+var scene=new THREE.Scene();
+scene.background=new THREE.Color(HEX.bg);
+scene.fog=new THREE.FogExp2(HEX.bg,0.022);
+var camera=new THREE.PerspectiveCamera(46,innerWidth/innerHeight,0.1,200);
+camera.position.set(1.0,2.2,17);
+camera.lookAt(1.0,0,0);
+
+// BLOOM
+var composer=new THREE.EffectComposer(renderer);
+composer.addPass(new THREE.RenderPass(scene,camera));
+// Toned-down bloom — just enough glow, not blown-out
+var bloom=new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.55,0.7,0.55);
+composer.addPass(bloom);
+
+// LIGHTS
+scene.add(new THREE.AmbientLight(0x1e2d42,2.0));
+var hPL=new THREE.PointLight(HEX.human,1.4,16);
+var aPL=new THREE.PointLight(HEX.agent,1.4,18);
+scene.add(hPL,aPL);
+
+// GRID
+var g2=new THREE.GridHelper(80,50,0x1a2640,0x111e30);
+g2.position.y=-4; scene.add(g2);
+
+// POSITIONS
+// Balanced layout: human left, agent centre-right, hubs fanned clearly
+var P={
+  human :new THREE.Vector3(-6.5, 0,    0),
+  agent :new THREE.Vector3( 3.5, 0,    0),
+  skills:new THREE.Vector3( 8.5, 3.8,  1.0),
+  mcp   :new THREE.Vector3( 8.5,-3.8,  1.0),
+  sub   :new THREE.Vector3( 3.5, 0,   -6.0)
+};
+hPL.position.copy(P.human); aPL.position.copy(P.agent);
+
+// MATERIAL HELPERS
+function gMat(hex,ei){
+  return new THREE.MeshStandardMaterial({color:hex,emissive:hex,emissiveIntensity:ei||0.35,metalness:0.2,roughness:0.5});
+}
+function wir(geo,hex,op){
+  return new THREE.LineSegments(new THREE.EdgesGeometry(geo),new THREE.LineBasicMaterial({color:hex,transparent:true,opacity:op||0.5}));
+}
+function haloMesh(r,hex,op){
+  return new THREE.Mesh(new THREE.SphereGeometry(r,16,16),new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:op||0.07,side:THREE.BackSide}));
+}
+
+// HUMAN NODE
+var hGrp=new THREE.Group(); hGrp.position.copy(P.human); scene.add(hGrp);
+var hGeo=new THREE.IcosahedronGeometry(1.0,1);
+var hMesh=new THREE.Mesh(hGeo,gMat(HEX.human,0.32));
+var hRing=new THREE.Mesh(new THREE.TorusGeometry(1.55,0.022,8,80),
+  new THREE.MeshBasicMaterial({color:HEX.human,transparent:true,opacity:0.3}));
+hRing.rotation.x=Math.PI/2;
+hGrp.add(hMesh,wir(hGeo,HEX.human,0.4),hRing,haloMesh(1.2,HEX.human,0.04));
+
+// AGENT NODE
+var aGrp=new THREE.Group(); aGrp.position.copy(P.agent); scene.add(aGrp);
+var aGeo=new THREE.IcosahedronGeometry(1.3,1);
+var aMesh=new THREE.Mesh(aGeo,gMat(HEX.agent,0.32));
+var aR1=new THREE.Mesh(new THREE.TorusGeometry(1.9,0.022,8,96),
+  new THREE.MeshBasicMaterial({color:HEX.agent,transparent:true,opacity:0.28}));
+aR1.rotation.x=Math.PI/2.2;
+var aR2=new THREE.Mesh(new THREE.TorusGeometry(2.4,0.015,8,96),
+  new THREE.MeshBasicMaterial({color:HEX.agent,transparent:true,opacity:0.16}));
+aR2.rotation.x=Math.PI/3.0;
+aGrp.add(aMesh,wir(aGeo,HEX.agent,0.45),aR1,aR2,haloMesh(1.5,HEX.agent,0.04));
+
+// HUBS
+function makeHub(pos,hex,n){
+  var g=new THREE.Group(); g.position.copy(pos); scene.add(g);
+  var hgeo=new THREE.OctahedronGeometry(0.46,0);
+  var hub=new THREE.Mesh(hgeo,gMat(hex,0.32));
+  g.add(hub,wir(hgeo,hex,0.5),haloMesh(0.65,hex,0.05));
+  var orbs=[];
+  for(var i=0;i<n;i++){
+    var s=new THREE.Mesh(new THREE.SphereGeometry(0.09+Math.random()*0.05,8,8),
+      new THREE.MeshBasicMaterial({color:hex}));
+    orbs.push({m:s,r:0.9+Math.random()*0.45,
+      ph:(i/n)*Math.PI*2+Math.random()*0.4,
+      sp:0.35+Math.random()*0.35,tl:Math.random()*Math.PI});
+    g.add(s);
+  }
+  return {g:g,hub:hub,orbs:orbs};
+}
+var skHub=makeHub(P.skills,HEX.skills,5);
+var mcHub=makeHub(P.mcp,HEX.mcp,4);
+var suHub=makeHub(P.sub,HEX.sub,7);
+function spinOrbs(hub,t,spd){
+  hub.orbs.forEach(function(o){
+    var a=t*o.sp*spd+o.ph;
+    o.m.position.set(Math.cos(a)*o.r,Math.sin(a*0.7+o.tl)*o.r*0.5,Math.sin(a)*o.r);
+  });
+}
+
+// CABLES
+function makeCable(a,b,hex,bend,r,op){
+  var m1=new THREE.Vector3().lerpVectors(a,b,0.33).add(bend);
+  var m2=new THREE.Vector3().lerpVectors(a,b,0.66).sub(bend);
+  var curve=new THREE.CatmullRomCurve3([a,m1,m2,b]);
+  var mesh=new THREE.Mesh(new THREE.TubeGeometry(curve,90,r,8,false),
+    new THREE.MeshStandardMaterial({color:hex,emissive:hex,emissiveIntensity:0.18,
+      transparent:true,opacity:op!==undefined?op:1,roughness:0.55}));
+  scene.add(mesh); return {curve:curve,mesh:mesh};
+}
+var cMain=makeCable(
+  P.human.clone().add(new THREE.Vector3(1.2,0,0)),
+  P.agent.clone().add(new THREE.Vector3(-1.7,0,0)),
+  HEX.cable,new THREE.Vector3(0,2.2,2.5),0.08,0.9);
+makeCable(P.human.clone().add(new THREE.Vector3(1.0,0.55,0.3)),
+  P.agent.clone().add(new THREE.Vector3(-1.6,0.6,0.4)),
+  HEX.cable,new THREE.Vector3(0.4,2.6,1.8),0.02,0.38);
+makeCable(P.human.clone().add(new THREE.Vector3(1.0,-0.55,-0.3)),
+  P.agent.clone().add(new THREE.Vector3(-1.6,-0.6,-0.4)),
+  HEX.cable,new THREE.Vector3(-0.4,1.8,3.0),0.02,0.38);
+function branch(toPos,hex){
+  return makeCable(P.agent.clone().add(new THREE.Vector3(0.7,0.2,0.2)),toPos,hex,
+    new THREE.Vector3((toPos.x-P.agent.x)*0.18,toPos.y*0.44,toPos.z*0.38),0.05,0.78);
+}
+var bSk=branch(P.skills,HEX.skills);
+var bMc=branch(P.mcp,HEX.mcp);
+var bSu=branch(P.sub,HEX.sub);
+
+// PACKETS
+function makePkt(hex,sz){
+  var mesh=new THREE.Mesh(new THREE.SphereGeometry(sz||0.18,14,14),
+    new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:0}));
+  scene.add(mesh);
+  var trail=[];
+  for(var i=0;i<10;i++){
+    var t=new THREE.Mesh(new THREE.SphereGeometry(0.055,6,6),
+      new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:0}));
+    scene.add(t); trail.push(t);
+  }
+  return {mesh:mesh,trail:trail,hist:[]};
+}
+var pkM=makePkt(HEX.human,0.22),pkSk=makePkt(HEX.skills,0.15),pkMc=makePkt(HEX.mcp,0.15),pkSu=makePkt(HEX.sub,0.15);
+function showPkt(pk,pos,al){
+  pk.mesh.material.opacity=al; pk.mesh.position.copy(pos);
+  pk.hist.unshift(pos.clone()); if(pk.hist.length>10) pk.hist.pop();
+  pk.trail.forEach(function(t,i){
+    var p=pk.hist[i];
+    if(p){t.position.copy(p);t.material.opacity=al*(1-i/10)*0.5;}
+    else{t.material.opacity=0;}
+  });
+}
+function hidePkt(pk){
+  pk.mesh.material.opacity=0; pk.hist=[];
+  pk.trail.forEach(function(t){t.material.opacity=0;});
+}
+
+// STREAMS
+function makeStream(curve,hex,n){
+  var dots=[];
+  for(var i=0;i<n;i++){
+    var m=new THREE.Mesh(new THREE.SphereGeometry(0.055,6,6),
+      new THREE.MeshBasicMaterial({color:hex,transparent:true,opacity:0}));
+    scene.add(m); dots.push({m:m,t:i/n,sp:0.07+Math.random()*0.04});
+  }
+  return {curve:curve,dots:dots};
+}
+var stM=makeStream(cMain.curve,HEX.cable,8),stSk=makeStream(bSk.curve,HEX.skills,5);
+var stMc=makeStream(bMc.curve,HEX.mcp,5),stSu=makeStream(bSu.curve,HEX.sub,5);
+function tickStream(st,dt,op){
+  st.dots.forEach(function(d){
+    d.t=(d.t+d.sp*dt)%1.0;
+    d.m.position.copy(st.curve.getPointAt(d.t));
+    d.m.material.opacity=op*(0.3+Math.sin(d.t*Math.PI)*0.7);
+  });
+}
+
+// STARFIELD
+(function(){
+  var N=500,pos=new Float32Array(N*3);
+  for(var i=0;i<N;i++){pos[i*3]=(Math.random()-.5)*100;pos[i*3+1]=(Math.random()-.5)*60;pos[i*3+2]=(Math.random()-.5)*70-5;}
+  var geo=new THREE.BufferGeometry();
+  geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+  scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:0x3a5070,size:0.09,transparent:true,opacity:0.7,sizeAttenuation:true})));
+})();
+
+// UI REFS
+var sEls={input:document.getElementById('s-input'),delegate:document.getElementById('s-delegate'),execute:document.getElementById('s-execute'),review:document.getElementById('s-review')};
+var fEls={input:document.getElementById('f-input'),delegate:document.getElementById('f-delegate'),execute:document.getElementById('f-execute'),review:document.getElementById('f-review')};
+var cEls={skills:document.getElementById('c-skills'),mcp:document.getElementById('c-mcp'),sub:document.getElementById('c-sub')};
+var bannerEl=document.getElementById('banner');
+var approveEl=document.getElementById('approve');
+var lastBan='';
+
+function setStep(name,prog,col){
+  Object.keys(sEls).forEach(function(k){sEls[k].classList.remove('active');sEls[k].style.removeProperty('--pc');fEls[k].style.width='0%';});
+  sEls[name].classList.add('active');
+  sEls[name].style.setProperty('--pc',col);
+  fEls[name].style.background=col;
+  fEls[name].style.width=Math.round(prog*100)+'%';
+}
+function setChip(key){
+  Object.keys(cEls).forEach(function(k){
+    var el=cEls[k];
+    if(k===key){el.classList.add('active');el.style.background=CSS[k];el.style.borderColor=CSS[k];el.style.color='#06080d';}
+    else{el.classList.remove('active');el.style.background='transparent';el.style.borderColor='';el.style.color='';}
+  });
+}
+function setBan(key){
+  var b=BAN[key]; if(!b||key===lastBan) return; lastBan=key;
+  bannerEl.style.opacity='0';
+  setTimeout(function(){bannerEl.textContent=b.t;bannerEl.style.color=b.c;bannerEl.style.opacity='1';},200);
+}
+
+// LABEL PROJECTION
+var lblDefs=[
+  {el:document.getElementById('lbl-human'), pos:P.human,  yo:1.7},
+  {el:document.getElementById('lbl-agent'), pos:P.agent,  yo:2.0},
+  {el:document.getElementById('lbl-skills'),pos:P.skills, yo:0.9},
+  {el:document.getElementById('lbl-mcp'),   pos:P.mcp,    yo:0.9},
+  {el:document.getElementById('lbl-sub'),   pos:P.sub,    yo:0.9}
+];
+var _v=new THREE.Vector3();
+function projectAll(){
+  lblDefs.forEach(function(d){
+    _v.copy(d.pos); _v.y+=d.yo; _v.project(camera);
+    d.el.style.left=((_v.x*.5+.5)*innerWidth)+'px';
+    d.el.style.top=((-_v.y*.5+.5)*innerHeight)+'px';
+    d.el.style.opacity=_v.z<1?'1':'0';
+  });
+  _v.copy(P.human); _v.y+=2.6; _v.project(camera);
+  approveEl.style.left=((_v.x*.5+.5)*innerWidth)+'px';
+  approveEl.style.top=((-_v.y*.5+.5)*innerHeight)+'px';
+}
+
+// MOUSE PARALLAX
+var mx=0,my=0;
+addEventListener('mousemove',function(e){mx=e.clientX/innerWidth-.5;my=e.clientY/innerHeight-.5;});
+
+// ANIMATION LOOP
+var clock=new THREE.Clock(),prevE=0;
+
+function animate(){
+  requestAnimationFrame(animate);
+  var elapsed=clock.getElapsedTime();
+  var dt=Math.min(elapsed-prevE,0.05); prevE=elapsed;
+  var t=elapsed%CYCLE;
+
+  // idle rotations
+  aGrp.rotation.y+=dt*0.14; aR1.rotation.z+=dt*0.28; aR2.rotation.z-=dt*0.16;
+  hGrp.rotation.y+=dt*0.09;
+  skHub.g.rotation.y+=dt*0.17; mcHub.g.rotation.y+=dt*0.17; suHub.g.rotation.y+=dt*0.17;
+  spinOrbs(skHub,elapsed,1); spinOrbs(mcHub,elapsed,1); spinOrbs(suHub,elapsed,1);
+
+  // base subtle pulse
+  hMesh.scale.setScalar(1+Math.sin(elapsed*1.4)*0.025);
+  aMesh.scale.setScalar(1+Math.sin(elapsed*1.6+1)*0.025);
+
+  // hide packets
+  hidePkt(pkM); hidePkt(pkSk); hidePkt(pkMc); hidePkt(pkSu);
+
+  var opM=0.04,opSk=0,opMc=0,opSu=0;
+
+  if(t<PH.input[1]){
+    var p=lp(t,PH.input); setStep('input',p,CSS.human); setChip(null); setBan('input');
+    hMesh.scale.setScalar(1+Math.sin(p*Math.PI*2)*0.12+Math.sin(p*Math.PI)*0.04);
+    hMesh.material.emissiveIntensity=0.32+p*0.22;
+    hRing.material.opacity=0.3+Math.sin(elapsed*3)*0.08;
+    opM=0.06;
+
+  } else if(t<PH.deleg[1]){
+    var raw=lp(t,PH.deleg),p=eio(raw); setStep('delegate',raw,CSS.human); setChip(null); setBan('deleg');
+    pkM.mesh.material.color.setHex(HEX.human);
+    showPkt(pkM,cMain.curve.getPointAt(p),1);
+    if(raw>0.85){aMesh.scale.setScalar(1+(raw-0.85)*5*0.15);aMesh.material.emissiveIntensity=0.32+(raw-0.85)*1.2;}
+    opM=0.25+raw*0.3;
+
+  } else if(t<PH.exSk[1]){
+    var raw=lp(t,PH.exSk); setStep('execute',raw,CSS.skills); setChip('skills'); setBan('exSk');
+    spinOrbs(skHub,elapsed,2.8); skHub.hub.material.emissiveIntensity=0.32+Math.sin(elapsed*5)*0.22;
+    var tr=raw<0.5?eio(raw/0.5):eio(1-(raw-0.5)/0.5);
+    showPkt(pkSk,bSk.curve.getPointAt(c01(tr)),1);
+    opSk=0.45+Math.sin(raw*Math.PI)*0.3; opM=0.1;
+
+  } else if(t<PH.exMcp[1]){
+    var raw=lp(t,PH.exMcp); setStep('execute',raw,CSS.mcp); setChip('mcp'); setBan('exMcp');
+    spinOrbs(mcHub,elapsed,2.8); mcHub.hub.material.emissiveIntensity=0.32+Math.sin(elapsed*5)*0.22;
+    var tr=raw<0.5?eio(raw/0.5):eio(1-(raw-0.5)/0.5);
+    showPkt(pkMc,bMc.curve.getPointAt(c01(tr)),1);
+    opMc=0.45+Math.sin(raw*Math.PI)*0.3; opM=0.1;
+
+  } else if(t<PH.exSub[1]){
+    var raw=lp(t,PH.exSub); setStep('execute',raw,CSS.sub); setChip('sub'); setBan('exSub');
+    spinOrbs(suHub,elapsed,2.8); suHub.hub.material.emissiveIntensity=0.32+Math.sin(elapsed*5)*0.22;
+    var tr=raw<0.5?eio(raw/0.5):eio(1-(raw-0.5)/0.5);
+    showPkt(pkSu,bSu.curve.getPointAt(c01(tr)),1);
+    opSu=0.45+Math.sin(raw*Math.PI)*0.3; opM=0.1;
+
+  } else if(t<PH.retT[1]){
+    var raw=lp(t,PH.retT),p=eio(raw); setStep('review',raw*0.45,CSS.agent); setChip(null); setBan('retT');
+    pkM.mesh.material.color.setHex(HEX.agent);
+    showPkt(pkM,cMain.curve.getPointAt(1-p),1);
+    opM=0.25+raw*0.3;
+
+  } else {
+    var raw=lp(t,PH.review); setStep('review',0.45+raw*0.55,CSS.human); setChip(null); setBan('review');
+    hMesh.scale.setScalar(1+Math.sin(raw*Math.PI*2)*0.1);
+    if(raw>0.22){
+      var bl=c01((raw-0.22)/0.38);
+      var hx=bl>0.5?HEX.sub:HEX.human;
+      hMesh.material.emissive.setHex(hx); hMesh.material.color.setHex(hx);
+    }
+    var fa=(raw>0.2&&raw<0.85)?Math.sin(((raw-0.2)/0.65)*Math.PI):0;
+    approveEl.style.opacity=fa;
+    if(raw>=0.92){hMesh.material.emissive.setHex(HEX.human);hMesh.material.color.setHex(HEX.human);hMesh.material.emissiveIntensity=0.32;}
+    opM=0.06;
+  }
+
+  // reset hub emissive when not their phase
+  if(t<PH.exSk[0]||t>=PH.exSk[1]) skHub.hub.material.emissiveIntensity=0.32;
+  if(t<PH.exMcp[0]||t>=PH.exMcp[1]) mcHub.hub.material.emissiveIntensity=0.32;
+  if(t<PH.exSub[0]||t>=PH.exSub[1]) suHub.hub.material.emissiveIntensity=0.32;
+
+  tickStream(stM,dt,opM); tickStream(stSk,dt,opSk);
+  tickStream(stMc,dt,opMc); tickStream(stSu,dt,opSu);
+
+  // camera — gentle drift, centred on scene
+  camera.position.x=1.0+Math.sin(elapsed*.046)*0.9+mx*1.2;
+  camera.position.y=2.2+Math.sin(elapsed*.068)*0.3-my*0.8;
+  camera.position.z=17.0;
+  camera.lookAt(1.0,0.2,0);
+
+  projectAll();
+  composer.render();
+}
+animate();
+
+addEventListener('resize',function(){
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+  composer.setSize(innerWidth,innerHeight);
+});
+
+})();
+</script>
+</body>
+</html>

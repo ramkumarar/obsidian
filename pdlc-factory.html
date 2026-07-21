@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>PDLC — The Autonomous Software Factory</title>
+<style>
+:root{
+  --bg:#0b0f1a;--text:#e2e8f5;--dim:#8899bb;--line:#1e3a5f;
+  --human:#f9c74f;--agent:#43c6ac;--orch:#43c6ac;
+  --fe:#69f0ae;--sa:#b39dff;--sb:#f06292;
+  --approve:#69f0ae;--refine:#ffb347;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;height:100%;width:100%;overflow:hidden}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 20px 14px}
+.hcard{background:rgba(8,12,24,.88);border:1px solid var(--line);border-radius:14px;padding:14px 20px 12px;backdrop-filter:blur(10px);width:100%;max-width:860px}
+.ey{font-size:10px;letter-spacing:.32em;color:var(--agent);font-weight:700;margin-bottom:5px;text-transform:uppercase;font-family:'JetBrains Mono','Courier New',monospace}
+.ti{font-weight:800;font-size:20px;color:var(--text);margin-bottom:4px}
+.su{font-size:12px;color:var(--dim);line-height:1.6}
+#svg-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:860px}
+svg{width:100%;height:100%;max-height:calc(100vh - 180px)}
+.footer{width:100%;max-width:860px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.banner{font-size:13px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--text);opacity:0;transition:opacity .4s;text-align:center;min-height:18px}
+.stepper{display:flex;align-items:stretch;background:rgba(8,12,24,.92);border:1px solid var(--line);border-radius:12px;padding:10px 4px;width:100%;justify-content:stretch}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;border-right:1px solid var(--line)}
+.step:last-child{border-right:none}
+.step-n{font-size:9px;color:var(--dim);letter-spacing:.14em;margin-bottom:3px;font-family:'JetBrains Mono','Courier New',monospace}
+.step-l{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--dim);transition:color .3s,text-shadow .3s;text-align:center}
+.step.active .step-l{color:#fff}
+.step.active .step-n{color:var(--ac,var(--agent))}
+.gflash{position:fixed;pointer-events:none;font-size:14px;font-weight:800;letter-spacing:.12em;transform:translate(-50%,-50%);opacity:0;z-index:20;white-space:nowrap;border-radius:10px;padding:7px 16px;backdrop-filter:blur(8px)}
+.gflash.approve{color:var(--approve);border:1px solid var(--approve);background:rgba(8,12,24,.90);box-shadow:0 0 18px rgba(105,240,174,.25)}
+.gflash.refine{color:var(--refine);border:1px solid var(--refine);background:rgba(8,12,24,.90);box-shadow:0 0 18px rgba(255,179,71,.25)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hcard">
+    <div class="ey">Product Development Lifecycle · PDLC</div>
+    <div class="ti">The Autonomous Software Factory</div>
+    <div class="su">A requirement arrives. The factory analyzes impact, designs across components, spawns parallel agents, and assembles the result — with human review at every critical gate.</div>
+  </div>
+
+  <div id="svg-wrap">
+  <svg viewBox="0 0 860 700" xmlns="http://www.w3.org/2000/svg" id="mainsvg">
+    <!-- ── DEFS ── -->
+    <defs>
+      <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#1e3a5f" id="arrfill"/>
+      </marker>
+      <marker id="arr-act" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#43c6ac" id="arrfill-act"/>
+      </marker>
+      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+
+    <!-- ── BACKGROUND GRID (subtle) ── -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0L0 0 0 40" fill="none" stroke="#0e1828" stroke-width="0.5"/>
+    </pattern>
+    <rect width="860" height="700" fill="url(#grid)"/>
+
+    <!-- ══ ARROWS ══ -->
+    <!-- 1: Intake → Impact -->
+    <path id="a-intake-impact" d="M430,76 L430,108" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 2: Impact → Design -->
+    <path id="a-impact-design" d="M430,152 L430,188" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 3: Design → Frontend -->
+    <path id="a-design-fe" d="M430,224 C430,254 155,254 155,274" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 4: Design → ServiceA -->
+    <path id="a-design-sa" d="M430,224 L430,274" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 5: Design → ServiceB -->
+    <path id="a-design-sb" d="M430,224 C430,254 705,254 705,274" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 6-8: FE internal loop steps -->
+    <path id="a-fe-d" d="M155,312 L155,334" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-fe-a" d="M155,368 L155,390" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-fe-v" d="M155,424 L155,446" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <!-- 9-11: SA internal loop steps -->
+    <path id="a-sa-d" d="M430,312 L430,334" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sa-a" d="M430,368 L430,390" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sa-v" d="M430,424 L430,446" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <!-- 12-14: SB internal loop steps -->
+    <path id="a-sb-d" d="M705,312 L705,334" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sb-a" d="M705,368 L705,390" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sb-v" d="M705,424 L705,446" stroke="#1e3a5f" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+    <!-- 15-17: Verify → Integrate convergence -->
+    <path id="a-fe-int" d="M155,464 C155,520 406,540 406,540" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sa-int" d="M430,464 L430,516" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-sb-int" d="M705,464 C705,520 454,540 454,540" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 18: Integrate → Validate -->
+    <path id="a-int-val" d="M430,564 L430,598" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 19: Validate → Done -->
+    <path id="a-val-done" d="M430,638 L430,662" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Gate connectors (horizontal, dashed) -->
+    <path id="a-g1" d="M524,130 L752,130" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <path id="a-g2" d="M524,210 L752,210" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <path id="a-g3" d="M524,618 L752,618" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+
+    <!-- ══ NODES ══ -->
+    <!-- Intake -->
+    <g id="n-intake">
+      <circle cx="430" cy="54" r="22" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="58" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".08em" fill="#8899bb">INTAKE</text>
+    </g>
+    <!-- Impact Analysis -->
+    <g id="n-impact">
+      <rect x="340" y="108" width="180" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="125" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">IMPACT ANALYSIS</text>
+      <text x="430" y="141" text-anchor="middle" font-size="9" fill="#4a6080">orchestrator scopes change</text>
+    </g>
+    <!-- Design -->
+    <g id="n-design">
+      <rect x="340" y="188" width="180" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="205" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">DESIGN</text>
+      <text x="430" y="221" text-anchor="middle" font-size="9" fill="#4a6080">cross-component architecture</text>
+    </g>
+
+    <!-- ── LANE HEADERS ── -->
+    <!-- Frontend header -->
+    <g id="n-fe-hdr">
+      <rect x="82" y="274" width="146" height="38" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="155" y="289" text-anchor="middle" font-size="10" font-weight="800" letter-spacing=".06em" fill="#8899bb">FRONTEND</text>
+      <text x="155" y="303" text-anchor="middle" font-size="9" fill="#4a6080">React / Web</text>
+    </g>
+    <!-- ServiceA header -->
+    <g id="n-sa-hdr">
+      <rect x="357" y="274" width="146" height="38" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="289" text-anchor="middle" font-size="10" font-weight="800" letter-spacing=".06em" fill="#8899bb">SERVICE A</text>
+      <text x="430" y="303" text-anchor="middle" font-size="9" fill="#4a6080">Orders API</text>
+    </g>
+    <!-- ServiceB header -->
+    <g id="n-sb-hdr">
+      <rect x="632" y="274" width="146" height="38" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="705" y="289" text-anchor="middle" font-size="10" font-weight="800" letter-spacing=".06em" fill="#8899bb">SERVICE B</text>
+      <text x="705" y="303" text-anchor="middle" font-size="9" fill="#4a6080">Payments API</text>
+    </g>
+
+    <!-- ── LOOP STEP CIRCLES (per lane) ── -->
+    <!-- FE steps -->
+    <g id="n-fe-disc"><circle cx="155" cy="351" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="155" y="355" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">DISC</text></g>
+    <g id="n-fe-act"><circle cx="155" cy="407" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="155" y="411" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">ACT</text></g>
+    <g id="n-fe-ver"><circle cx="155" cy="463" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="155" y="467" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">VER</text></g>
+    <!-- SA steps -->
+    <g id="n-sa-disc"><circle cx="430" cy="351" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="430" y="355" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">DISC</text></g>
+    <g id="n-sa-act"><circle cx="430" cy="407" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="430" y="411" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">ACT</text></g>
+    <g id="n-sa-ver"><circle cx="430" cy="463" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="430" y="467" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">VER</text></g>
+    <!-- SB steps -->
+    <g id="n-sb-disc"><circle cx="705" cy="351" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="705" y="355" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">DISC</text></g>
+    <g id="n-sb-act"><circle cx="705" cy="407" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="705" y="411" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">ACT</text></g>
+    <g id="n-sb-ver"><circle cx="705" cy="463" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="705" y="467" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">VER</text></g>
+
+    <!-- Integrate -->
+    <g id="n-integrate">
+      <circle cx="430" cy="540" r="26" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="537" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".06em" fill="#8899bb">INTE-</text>
+      <text x="430" y="549" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".06em" fill="#8899bb">GRATE</text>
+    </g>
+    <!-- Validate -->
+    <g id="n-validate">
+      <rect x="340" y="598" width="180" height="40" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="614" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">VALIDATE</text>
+      <text x="430" y="629" text-anchor="middle" font-size="9" fill="#4a6080">end-to-end check</text>
+    </g>
+    <!-- Done -->
+    <g id="n-done">
+      <circle cx="430" cy="672" r="20" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="430" y="676" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">DONE</text>
+    </g>
+
+    <!-- ── HUMAN GATE NODES ── -->
+    <g id="n-gate1">
+      <circle cx="790" cy="130" r="22" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="790" y="126" text-anchor="middle" font-size="9" fill="#8899bb">GATE</text>
+      <text x="790" y="138" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">1</text>
+    </g>
+    <g id="n-gate2">
+      <circle cx="790" cy="210" r="22" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="790" y="206" text-anchor="middle" font-size="9" fill="#8899bb">GATE</text>
+      <text x="790" y="218" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">2</text>
+    </g>
+    <g id="n-gate3">
+      <circle cx="790" cy="618" r="22" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="790" y="614" text-anchor="middle" font-size="9" fill="#8899bb">GATE</text>
+      <text x="790" y="626" text-anchor="middle" font-size="9" font-weight="700" fill="#8899bb">3</text>
+    </g>
+
+    <!-- ── MOVING PACKET ── -->
+    <circle id="packet" cx="-100" cy="-100" r="6" fill="#43c6ac" opacity="0"/>
+    <!-- Lane packet indicators (one per lane, for parallel execute) -->
+    <circle id="pkt-fe"  cx="-100" cy="-100" r="5" fill="#69f0ae" opacity="0"/>
+    <circle id="pkt-sa"  cx="-100" cy="-100" r="5" fill="#b39dff" opacity="0"/>
+    <circle id="pkt-sb"  cx="-100" cy="-100" r="5" fill="#f06292" opacity="0"/>
+    <!-- Convergence packets -->
+    <circle id="pkt-fe-int" cx="-100" cy="-100" r="5" fill="#69f0ae" opacity="0"/>
+    <circle id="pkt-sa-int" cx="-100" cy="-100" r="5" fill="#b39dff" opacity="0"/>
+    <circle id="pkt-sb-int" cx="-100" cy="-100" r="5" fill="#f06292" opacity="0"/>
+  </svg>
+  </div>
+
+  <div class="footer">
+    <div class="banner" id="banner"></div>
+    <div class="stepper">
+      <div class="step" id="st0"><div class="step-n">01</div><div class="step-l">Intake</div></div>
+      <div class="step" id="st1"><div class="step-n">02</div><div class="step-l">Impact</div></div>
+      <div class="step" id="st2"><div class="step-n">03</div><div class="step-l">Design</div></div>
+      <div class="step" id="st3"><div class="step-n">04</div><div class="step-l">Execute</div></div>
+      <div class="step" id="st4"><div class="step-n">05</div><div class="step-l">Integrate</div></div>
+      <div class="step" id="st5"><div class="step-n">06</div><div class="step-l">Validate</div></div>
+    </div>
+  </div>
+</div>
+<div class="gflash approve" id="flash-approve" style="left:50%;top:40%">✓ APPROVED</div>
+<div class="gflash refine"  id="flash-refine"  style="left:50%;top:40%">↺ REFINE</div>
+
+<script>
+(function(){
+'use strict';
+// ── COLOURS ──────────────────────────────────────────────────────
+var C={
+  dim:'#1e3a5f', text:'#8899bb', agent:'#43c6ac', human:'#f9c74f',
+  fe:'#69f0ae', sa:'#b39dff', sb:'#f06292',
+  approve:'#69f0ae', refine:'#ffb347', orch:'#43c6ac',
+  dimText:'#4a6080'
+};
+
+// ── TIMING ───────────────────────────────────────────────────────
+var CYCLE = 33;
+// Phase: [id, start, end, stepIdx, bannerText, color]
+var PHASES = [
+  ['intake',   0,    3,   0, 'Requirement arrives — Factory initializes',                    C.agent],
+  ['impact',   3,    8,   1, 'Orchestrator identifies cross-component impact',               C.orch],
+  ['gate1',    8,   10,   1, 'Gate 1 — Human reviews scope',                                C.human],
+  ['design',  10,   15,   2, 'Agent produces cross-component design',                       C.agent],
+  ['gate2',   15,   17,   2, 'Gate 2 — Human reviews design',                              C.human],
+  ['execute', 17,   27,   3, 'Factory spawns parallel agents — Frontend · Service A · Service B', C.agent],
+  ['integrate',27,  29,   4, 'Streams converge — assembling output',                        C.orch],
+  ['validate', 29,  31,   5, 'Gate 3 — Human validates assembled output',                  C.human],
+  ['end',      31,  33,   5, '',                                                             C.agent]
+];
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function norm(t,s,e){return clamp((t-s)/(e-s),0,1);}
+function eio(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+
+// ── DOM REFS ─────────────────────────────────────────────────────
+function el(id){return document.getElementById(id);}
+var bannerEl = el('banner');
+var flashApprove = el('flash-approve');
+var flashRefine  = el('flash-refine');
+var stepEls = [el('st0'),el('st1'),el('st2'),el('st3'),el('st4'),el('st5')];
+
+// SVG node groups
+var nodes = {
+  intake:   el('n-intake'),   impact:  el('n-impact'),
+  design:   el('n-design'),
+  feHdr:    el('n-fe-hdr'),   saHdr:  el('n-sa-hdr'),   sbHdr:  el('n-sb-hdr'),
+  feDisc:   el('n-fe-disc'),  feAct:  el('n-fe-act'),   feVer:  el('n-fe-ver'),
+  saDisc:   el('n-sa-disc'),  saAct:  el('n-sa-act'),   saVer:  el('n-sa-ver'),
+  sbDisc:   el('n-sb-disc'),  sbAct:  el('n-sb-act'),   sbVer:  el('n-sb-ver'),
+  integrate:el('n-integrate'),validate:el('n-validate'),done:   el('n-done'),
+  gate1:    el('n-gate1'),    gate2:  el('n-gate2'),    gate3:  el('n-gate3')
+};
+
+// SVG arrow paths
+var arrows = {
+  intakeImpact: el('a-intake-impact'), impactDesign: el('a-impact-design'),
+  designFe:     el('a-design-fe'),     designSa:     el('a-design-sa'),     designSb: el('a-design-sb'),
+  feD:el('a-fe-d'), feA:el('a-fe-a'), feV:el('a-fe-v'),
+  saD:el('a-sa-d'), saA:el('a-sa-a'), saV:el('a-sa-v'),
+  sbD:el('a-sb-d'), sbA:el('a-sb-a'), sbV:el('a-sb-v'),
+  feInt:el('a-fe-int'), saInt:el('a-sa-int'), sbInt:el('a-sb-int'),
+  intVal:el('a-int-val'), valDone:el('a-val-done'),
+  g1:el('a-g1'), g2:el('a-g2'), g3:el('a-g3')
+};
+
+// Packet circles
+var pkts = {
+  main:  el('packet'),
+  fe:    el('pkt-fe'),    sa:   el('pkt-sa'),   sb:  el('pkt-sb'),
+  feInt: el('pkt-fe-int'),saInt:el('pkt-sa-int'),sbInt:el('pkt-sb-int')
+};
+
+// ── PATH UTILS ───────────────────────────────────────────────────
+var pathCache = {};
+function getPath(id){
+  if(!pathCache[id]){pathCache[id]=document.getElementById(id);}
+  return pathCache[id];
+}
+function pktOnPath(pktEl, pathId, t, color){
+  var p = getPath(pathId);
+  if(!p) return;
+  var len = p.getTotalLength();
+  var pt  = p.getPointAtLength(clamp(t,0,1) * len);
+  pktEl.setAttribute('cx', pt.x);
+  pktEl.setAttribute('cy', pt.y);
+  pktEl.setAttribute('fill', color);
+  pktEl.setAttribute('opacity', '1');
+}
+function hidePkt(pktEl){pktEl.setAttribute('opacity','0'); pktEl.setAttribute('cx','-100'); pktEl.setAttribute('cy','-100');}
+
+// ── NODE ACTIVATE ────────────────────────────────────────────────
+function activateNode(grp, color, intensity){
+  if(!grp) return;
+  intensity = intensity !== undefined ? intensity : 1;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke', color);
+    shape.setAttribute('stroke-width', intensity > 0.5 ? '2.5' : '2');
+    shape.setAttribute('fill', 'rgba(8,12,24,0.95)');
+    if(intensity > 0.5){
+      shape.style.filter = 'drop-shadow(0 0 6px '+color+')';
+    } else {
+      shape.style.filter = '';
+    }
+  }
+  var texts = grp.querySelectorAll('text');
+  if(texts[0]) texts[0].setAttribute('fill', intensity > 0.5 ? color : C.text);
+}
+function dimNode(grp){
+  if(!grp) return;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke', C.dim);
+    shape.setAttribute('stroke-width','1.5');
+    shape.removeAttribute('filter');
+    shape.style.filter = '';
+    shape.setAttribute('fill', '#0b0f1a');
+  }
+  var texts = grp.querySelectorAll('text');
+  if(texts[0]) texts[0].setAttribute('fill', C.text);
+  if(texts[1]) texts[1].setAttribute('fill', C.dimText);
+}
+function doneNode(grp, color){
+  if(!grp) return;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke', color);
+    shape.setAttribute('stroke-width','1.8');
+    shape.style.filter = 'drop-shadow(0 0 4px '+color+'66)';
+  }
+  var texts = grp.querySelectorAll('text');
+  texts[0] && texts[0].setAttribute('fill', color);
+}
+
+// ── ARROW ACTIVATE ───────────────────────────────────────────────
+function activateArrow(pathEl, color){
+  if(!pathEl) return;
+  pathEl.setAttribute('stroke', color);
+  pathEl.setAttribute('stroke-width','2');
+  pathEl.setAttribute('stroke-dasharray','8 5');
+}
+function dimArrow(pathEl){
+  if(!pathEl) return;
+  pathEl.setAttribute('stroke', C.dim);
+  pathEl.setAttribute('stroke-width','1.5');
+  pathEl.setAttribute('stroke-dasharray','none');
+}
+function flowArrow(pathEl, color, offset){
+  if(!pathEl) return;
+  pathEl.setAttribute('stroke', color);
+  pathEl.setAttribute('stroke-width','2');
+  pathEl.setAttribute('stroke-dasharray','8 5');
+  pathEl.setAttribute('stroke-dashoffset', String(-offset % 13));
+}
+
+// ── STEPPER ──────────────────────────────────────────────────────
+var STEP_COLORS = [C.agent,C.orch,C.agent,C.fe,C.orch,C.human];
+function setStep(idx){
+  stepEls.forEach(function(s,i){
+    s.classList.remove('active');
+    s.style.removeProperty('--ac');
+  });
+  if(idx >= 0 && idx < stepEls.length){
+    stepEls[idx].classList.add('active');
+    stepEls[idx].style.setProperty('--ac', STEP_COLORS[idx]);
+  }
+}
+
+// ── BANNER ───────────────────────────────────────────────────────
+var lastBanner = '';
+function setBanner(text, color){
+  if(text === lastBanner) return;
+  lastBanner = text;
+  bannerEl.style.opacity = '0';
+  setTimeout(function(){
+    bannerEl.textContent = text;
+    bannerEl.style.color  = color || C.text;
+    bannerEl.style.opacity = '1';
+  }, 200);
+}
+
+// ── GATE FLASH ───────────────────────────────────────────────────
+var flashActive = {};
+function flash(type){
+  if(flashActive[type]) return;
+  flashActive[type] = true;
+  var el = type === 'approve' ? flashApprove : flashRefine;
+  el.style.opacity = '0';
+  var start = null;
+  function step(ts){
+    if(!start) start = ts;
+    var p = (ts - start) / 1600;
+    if(p >= 1){ el.style.opacity = '0'; flashActive[type] = false; return; }
+    el.style.opacity = p < 0.12 ? String(p/0.12) : p > 0.68 ? String(1-(p-0.68)/0.32) : '1';
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+// ── RESET ALL ────────────────────────────────────────────────────
+function resetAll(){
+  // Reset all nodes
+  for(var k in nodes){ if(nodes.hasOwnProperty(k)) dimNode(nodes[k]); }
+  // Reset arrows except gate connectors (g1, g2, g3) which stay dashed
+  for(var k in arrows){
+    if(!arrows.hasOwnProperty(k)) continue;
+    if(k === 'g1' || k === 'g2' || k === 'g3'){
+      arrows[k].setAttribute('stroke', C.dim);
+      arrows[k].setAttribute('stroke-width','1.5');
+      // leave stroke-dasharray as is
+    } else {
+      dimArrow(arrows[k]);
+    }
+  }
+  // Reset packets
+  for(var k in pkts){ if(pkts.hasOwnProperty(k)) hidePkt(pkts[k]); }
+}
+
+// ── MAIN LOOP ────────────────────────────────────────────────────
+var startTime = null;
+var arrowOffset = 0;
+var prevPhase = null;
+var approvedGates = {};
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  if(!startTime) startTime = ts;
+  var elapsed = (ts - startTime) / 1000;
+  var t = elapsed % CYCLE;
+  var cycleNum = Math.floor(elapsed / CYCLE);
+  arrowOffset += 0.18;
+
+  // Determine current phase
+  var phase = PHASES[PHASES.length-1];
+  for(var i=0;i<PHASES.length;i++){
+    if(t >= PHASES[i][1] && t < PHASES[i][2]){ phase = PHASES[i]; break; }
+  }
+
+  if(phase[0] !== prevPhase){
+    prevPhase = phase[0];
+    if(phase[0] === 'gate1' || phase[0] === 'gate2' || phase[0] === 'validate'){
+      approvedGates[phase[0]] = false;
+    }
+    resetAll();
+  }
+
+  var id = phase[0];
+  var ps = phase[1], pe = phase[2];
+  var p  = norm(t, ps, pe);
+  var ep = eio(p);
+
+  setStep(phase[3]);
+  setBanner(phase[4], phase[5]);
+
+  // ── PHASE RENDERING ──────────────────────────────────────────
+  if(id === 'intake'){
+    activateNode(nodes.intake, C.agent, ep);
+    flowArrow(arrows.intakeImpact, C.agent+'44', arrowOffset);
+    if(ep > 0.4) pktOnPath(pkts.main, 'a-intake-impact', (ep-0.4)/0.6, C.agent);
+    else hidePkt(pkts.main);
+
+  } else if(id === 'impact'){
+    doneNode(nodes.intake, C.agent);
+    activateNode(nodes.impact, C.orch, ep);
+    flowArrow(arrows.intakeImpact, C.orch, arrowOffset);
+    flowArrow(arrows.g1, C.orch+'88', arrowOffset*0.5);
+    pktOnPath(pkts.main, 'a-intake-impact', 1, C.orch);
+
+  } else if(id === 'gate1'){
+    doneNode(nodes.intake, C.agent);
+    doneNode(nodes.impact, C.orch);
+    activateNode(nodes.gate1, C.human, ep);
+    flowArrow(arrows.g1, C.human, arrowOffset*0.4);
+    if(ep > 0.6 && !approvedGates['gate1']){
+      approvedGates['gate1'] = true;
+      flash('approve');
+    }
+
+  } else if(id === 'design'){
+    doneNode(nodes.intake, C.agent); doneNode(nodes.impact, C.orch);
+    doneNode(nodes.gate1, C.human);
+    activateNode(nodes.design, C.agent, ep);
+    flowArrow(arrows.impactDesign, C.agent, arrowOffset);
+    flowArrow(arrows.g2, C.agent+'44', arrowOffset*0.5);
+    pktOnPath(pkts.main, 'a-impact-design', ep, C.agent);
+
+  } else if(id === 'gate2'){
+    doneNode(nodes.intake, C.agent); doneNode(nodes.impact, C.orch);
+    doneNode(nodes.gate1, C.human); doneNode(nodes.design, C.agent);
+    activateNode(nodes.gate2, C.human, ep);
+    flowArrow(arrows.g2, C.human, arrowOffset*0.4);
+    if(ep > 0.6 && !approvedGates['gate2']){
+      approvedGates['gate2'] = true;
+      flash('approve');
+    }
+
+  } else if(id === 'execute'){
+    // All upstream done
+    doneNode(nodes.intake, C.agent); doneNode(nodes.impact, C.orch);
+    doneNode(nodes.gate1, C.human); doneNode(nodes.design, C.agent);
+    doneNode(nodes.gate2, C.human);
+    // Fan-out arrows activate
+    flowArrow(arrows.designFe, C.fe, arrowOffset);
+    flowArrow(arrows.designSa, C.sa, arrowOffset);
+    flowArrow(arrows.designSb, C.sb, arrowOffset);
+
+    // laneStep: all arrow args are string IDs, pktEl is DOM element
+    // s0/s1/s2 are progress thresholds within the execute phase (0..1)
+    function laneStep(lp, s0, s1, s2,
+                      hdr, disc, act, ver, color,
+                      idDisc, idAct, idVer, idFanOut,
+                      pktEl, idConv, pktConvEl){
+      activateNode(hdr, color, 1);
+      var done = lp >= s2;
+
+      // Fan-out packet travels down from design to lane header
+      if(lp < s0 * 0.5){
+        pktOnPath(pktEl, idFanOut, eio(lp / (s0 * 0.5)), color);
+      }
+
+      // Discover step
+      if(lp >= 0 && lp < s0){
+        activateNode(disc, color, 1);
+        flowArrow(getPath(idDisc), color, arrowOffset);
+        pktOnPath(pktEl, idDisc, eio(norm(lp, 0, s0)), color);
+      } else if(lp >= s0){
+        doneNode(disc, color);
+        dimArrow(getPath(idDisc));
+      }
+
+      // Act step
+      if(lp >= s0 && lp < s1){
+        activateNode(act, color, 1);
+        flowArrow(getPath(idAct), color, arrowOffset);
+        pktOnPath(pktEl, idAct, eio(norm(lp, s0, s1)), color);
+      } else if(lp >= s1){
+        doneNode(act, color);
+        dimArrow(getPath(idAct));
+      }
+
+      // Verify step
+      if(lp >= s1 && lp < s2){
+        activateNode(ver, color, 1);
+        flowArrow(getPath(idVer), color, arrowOffset);
+        pktOnPath(pktEl, idVer, eio(norm(lp, s1, s2)), color);
+      } else if(lp >= s2){
+        doneNode(ver, color);
+        dimArrow(getPath(idVer));
+      }
+
+      // Convergence: packet travels from lane bottom to integrate node
+      if(done){
+        flowArrow(getPath(idConv), color, arrowOffset);
+        pktOnPath(pktConvEl, idConv, norm(lp, s2, 1.0), color);
+      } else {
+        hidePkt(pktConvEl);
+      }
+    }
+
+    laneStep(p, 0.15, 0.30, 0.45,
+      nodes.feHdr, nodes.feDisc, nodes.feAct, nodes.feVer, C.fe,
+      'a-fe-d','a-fe-a','a-fe-v','a-design-fe',
+      pkts.fe, 'a-fe-int', pkts.feInt);
+
+    laneStep(p, 0.20, 0.40, 0.60,
+      nodes.saHdr, nodes.saDisc, nodes.saAct, nodes.saVer, C.sa,
+      'a-sa-d','a-sa-a','a-sa-v','a-design-sa',
+      pkts.sa, 'a-sa-int', pkts.saInt);
+
+    laneStep(p, 0.17, 0.35, 0.57,
+      nodes.sbHdr, nodes.sbDisc, nodes.sbAct, nodes.sbVer, C.sb,
+      'a-sb-d','a-sb-a','a-sb-v','a-design-sb',
+      pkts.sb, 'a-sb-int', pkts.sbInt);
+
+  } else if(id === 'integrate'){
+    // All lanes done
+    doneNode(nodes.intake, C.agent); doneNode(nodes.impact, C.orch);
+    doneNode(nodes.gate1, C.human); doneNode(nodes.design, C.agent);
+    doneNode(nodes.gate2, C.human);
+    doneNode(nodes.feHdr, C.fe); doneNode(nodes.feDisc, C.fe); doneNode(nodes.feAct, C.fe); doneNode(nodes.feVer, C.fe);
+    doneNode(nodes.saHdr, C.sa); doneNode(nodes.saDisc, C.sa); doneNode(nodes.saAct, C.sa); doneNode(nodes.saVer, C.sa);
+    doneNode(nodes.sbHdr, C.sb); doneNode(nodes.sbDisc, C.sb); doneNode(nodes.sbAct, C.sb); doneNode(nodes.sbVer, C.sb);
+    activateNode(nodes.integrate, C.orch, ep);
+    flowArrow(arrows.feInt, C.fe, arrowOffset);
+    flowArrow(arrows.saInt, C.sa, arrowOffset);
+    flowArrow(arrows.sbInt, C.sb, arrowOffset);
+    pktOnPath(pkts.feInt, 'a-fe-int', ep, C.fe);
+    pktOnPath(pkts.saInt, 'a-sa-int', ep, C.sa);
+    pktOnPath(pkts.sbInt, 'a-sb-int', ep, C.sb);
+
+  } else if(id === 'validate'){
+    // All done upstream
+    doneNode(nodes.integrate, C.orch);
+    activateNode(nodes.validate, C.human, ep);
+    flowArrow(arrows.intVal, C.orch, arrowOffset);
+    flowArrow(arrows.g3, C.human+'88', arrowOffset*0.4);
+    activateNode(nodes.gate3, C.human, ep);
+    pktOnPath(pkts.main, 'a-int-val', ep, C.orch);
+    if(ep > 0.65 && !approvedGates['validate']){
+      approvedGates['validate'] = true;
+      // Odd cycles = refine, even = approve
+      flash(cycleNum % 2 === 1 ? 'refine' : 'approve');
+    }
+
+  } else if(id === 'end'){
+    var isRefine = cycleNum % 2 === 1;
+    if(isRefine){
+      setBanner('↺ Refine — Agent reworks Service A', C.refine);
+      doneNode(nodes.integrate, C.orch);
+      doneNode(nodes.validate, C.human);
+      activateNode(nodes.saHdr, C.refine, 0.8);
+      activateNode(nodes.saDisc, C.refine, 0.6);
+    } else {
+      setBanner('✓ Goal met — shipping output', C.approve);
+      doneNode(nodes.integrate, C.orch);
+      doneNode(nodes.validate, C.human);
+      activateNode(nodes.done, C.approve, ep);
+      flowArrow(arrows.valDone, C.approve, arrowOffset);
+      pktOnPath(pkts.main, 'a-val-done', ep, C.approve);
+    }
+  }
+}
+
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

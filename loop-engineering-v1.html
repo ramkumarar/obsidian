@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Loop Engineering — v1</title>
+<style>
+:root{
+  --bg:#0b0f1a;--text:#e2e8f5;--dim:#8899bb;--line:#1e3a5f;
+  --human:#f9c74f;--agent:#43c6ac;
+  --s0:#43c6ac;--s1:#ffb347;--s2:#69f0ae;--s3:#b39dff;--s4:#f9c74f;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;height:100%;width:100%;overflow:hidden}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 20px 14px}
+.hcard{background:rgba(8,12,24,.88);border:1px solid var(--line);border-radius:14px;padding:14px 20px 12px;backdrop-filter:blur(10px);width:100%;max-width:900px}
+.ey{font-size:10px;letter-spacing:.32em;color:var(--agent);font-weight:700;margin-bottom:5px;text-transform:uppercase;font-family:'JetBrains Mono','Courier New',monospace}
+.ti{font-weight:800;font-size:20px;color:var(--text);margin-bottom:4px}
+.su{font-size:12px;color:var(--dim);line-height:1.6}
+#svg-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:900px}
+svg{width:100%;height:100%;max-height:calc(100vh - 180px)}
+.footer{width:100%;max-width:900px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.banner{font-size:13px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--text);opacity:0;transition:opacity .4s;text-align:center;min-height:18px}
+.stepper{display:flex;align-items:stretch;background:rgba(8,12,24,.92);border:1px solid var(--line);border-radius:12px;padding:10px 4px;width:100%;justify-content:stretch}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;border-right:1px solid var(--line)}
+.step:last-child{border-right:none}
+.step-n{font-size:9px;color:var(--dim);letter-spacing:.14em;margin-bottom:3px;font-family:'JetBrains Mono','Courier New',monospace}
+.step-l{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--dim);transition:color .3s,text-shadow .3s;text-align:center}
+.step.active .step-l{color:#fff}
+.step.active .step-n{color:var(--ac,var(--agent))}
+.gflash{position:fixed;pointer-events:none;font-size:14px;font-weight:800;letter-spacing:.12em;transform:translate(-50%,-50%);opacity:0;z-index:20;white-space:nowrap;border-radius:10px;padding:7px 16px;backdrop-filter:blur(8px)}
+.gflash.exit{color:var(--s2);border:1px solid var(--s2);background:rgba(8,12,24,.90);box-shadow:0 0 18px rgba(105,240,174,.25)}
+.gflash.loop{color:var(--s1);border:1px solid var(--s1);background:rgba(8,12,24,.90);box-shadow:0 0 18px rgba(255,179,71,.25)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hcard">
+    <div class="ey">Agent Autonomy Pattern · Loop Engineering</div>
+    <div class="ti">You design the system that runs itself</div>
+    <div class="su">Design the loop once — define the goal, set the rules, set the exit condition. Step away. The agent drives the loop: Discover → Act → Verify → Remember → Decide.</div>
+  </div>
+
+  <div id="svg-wrap">
+  <svg viewBox="0 0 900 680" xmlns="http://www.w3.org/2000/svg" id="mainsvg">
+    <defs>
+      <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#1e3a5f"/>
+      </marker>
+      <marker id="arr-act" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#43c6ac"/>
+      </marker>
+      <marker id="arr-s0" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#43c6ac"/>
+      </marker>
+      <marker id="arr-s1" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#ffb347"/>
+      </marker>
+      <marker id="arr-s2" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#69f0ae"/>
+      </marker>
+      <marker id="arr-s3" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#b39dff"/>
+      </marker>
+      <marker id="arr-s4" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#f9c74f"/>
+      </marker>
+      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M40 0L0 0 0 40" fill="none" stroke="#0e1828" stroke-width="0.5"/>
+      </pattern>
+    </defs>
+    <rect width="900" height="680" fill="url(#grid)"/>
+
+    <!-- Dashed separator line (like the image) -->
+    <line id="sep" x1="60" y1="240" x2="840" y2="240" stroke="#1e3a5f" stroke-width="1" stroke-dasharray="8 5"/>
+
+    <!-- ── TOP SECTION: YOU → Design Loop → Launch ── -->
+    <!-- YOU node -->
+    <g id="n-you">
+      <circle cx="450" cy="52" r="24" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="450" y="46" text-anchor="middle" font-size="16" fill="#8899bb">☺</text>
+      <text x="450" y="60" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".1em" fill="#8899bb">YOU</text>
+    </g>
+    <!-- Arrow: YOU → Design Loop -->
+    <path id="a-you-design" d="M450,76 L450,110" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Design Loop node -->
+    <g id="n-design">
+      <rect x="330" y="110" width="240" height="68" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="450" y="129" text-anchor="middle" font-size="12" font-weight="700" letter-spacing=".06em" fill="#8899bb">Design the loop</text>
+      <text x="450" y="147" text-anchor="middle" font-size="10" fill="#4a6080">• Define goal  • Set rules</text>
+      <text x="450" y="162" text-anchor="middle" font-size="10" fill="#4a6080">• Set exit condition</text>
+    </g>
+    <!-- Arrow: Design → Launch label, then to ring -->
+    <path id="a-design-launch" d="M450,178 L450,215" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <text id="lbl-launch" x="462" y="202" font-size="10" font-weight="700" letter-spacing=".08em" fill="#4a6080">Launch</text>
+
+    <!-- "You built it. You stepped away." annotation -->
+    <text x="670" y="58" font-size="10" fill="#4a6080" font-style="italic">You built it.</text>
+    <text x="670" y="72" font-size="10" fill="#4a6080" font-style="italic">You stepped away.</text>
+    <path d="M660,65 Q560,65 500,52" stroke="#1e3a5f" stroke-width="1" fill="none" stroke-dasharray="4 3" marker-end="url(#arr)"/>
+
+    <!-- ── BOTTOM SECTION: 5-step ring centered ── -->
+    <!-- Ring outline (subtle circle) -->
+    <circle id="ring-outline" cx="450" cy="440" r="155" fill="none" stroke="#1e2d45" stroke-width="1" stroke-dasharray="4 4"/>
+
+    <!-- Ring arcs (the 5 curved arrows between nodes) -->
+    <!-- 0→1: DISCOVER→ACT (right side, clockwise) -->
+    <path id="a-0-1" d="M584,372 Q620,406 586,469" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 1→2: ACT→VERIFY (bottom-right) -->
+    <path id="a-1-2" d="M560,502 Q510,560 450,572" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 2→3: VERIFY→REMEMBER (bottom-left) -->
+    <path id="a-2-3" d="M420,572 Q358,560 310,502" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 3→4: REMEMBER→DECIDE (left side) -->
+    <path id="a-3-4" d="M308,469 Q272,406 313,372" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- 4→0: DECIDE→DISCOVER (top, looping back) -->
+    <path id="a-4-0" d="M384,328 Q420,295 450,290 Q478,292 512,328" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+    <!-- ── STEP NODES (ring positions) ── -->
+    <!-- 0: DISCOVER — top (cx=450, cy=345) -->
+    <g id="n-s0">
+      <rect x="378" y="316" width="144" height="58" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="420" y="336" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">🔍</text>
+      <text x="455" y="336" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb"> 1. DISCOVER</text>
+      <text x="450" y="353" text-anchor="middle" font-size="9" fill="#4a6080">Find the next task</text>
+      <text x="450" y="366" text-anchor="middle" font-size="9" fill="#4a6080"> </text>
+    </g>
+    <!-- 1: ACT — right (cx=580, cy=440) -->
+    <g id="n-s1">
+      <rect x="588" y="412" width="144" height="58" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="620" y="432" text-anchor="middle" font-size="11" fill="#8899bb">⚙</text>
+      <text x="650" y="432" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb"> 2. ACT</text>
+      <text x="660" y="449" text-anchor="middle" font-size="9" fill="#4a6080">Run the code,</text>
+      <text x="660" y="462" text-anchor="middle" font-size="9" fill="#4a6080">make the change</text>
+    </g>
+    <!-- 2: VERIFY — bottom-right (cx=530, cy=545) -->
+    <g id="n-s2">
+      <rect x="424" y="530" width="144" height="58" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="455" y="550" text-anchor="middle" font-size="11" fill="#8899bb">✓</text>
+      <text x="480" y="550" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb"> 3. VERIFY</text>
+      <text x="496" y="567" text-anchor="middle" font-size="9" fill="#4a6080">Did it work?</text>
+      <text x="496" y="580" text-anchor="middle" font-size="9" fill="#4a6080">Tests pass?</text>
+    </g>
+    <!-- 3: REMEMBER — bottom-left (cx=370, cy=545) -->
+    <g id="n-s3">
+      <rect x="168" y="530" width="144" height="58" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="200" y="550" text-anchor="middle" font-size="11" fill="#8899bb">📋</text>
+      <text x="230" y="550" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb"> 4. REMEMBER</text>
+      <text x="240" y="567" text-anchor="middle" font-size="9" fill="#4a6080">Store what</text>
+      <text x="240" y="580" text-anchor="middle" font-size="9" fill="#4a6080">happened</text>
+    </g>
+    <!-- 4: DECIDE — left (cx=168, cy=440) -->
+    <g id="n-s4">
+      <rect x="168" y="412" width="144" height="58" rx="10" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="198" y="432" text-anchor="middle" font-size="11" fill="#8899bb">⑂</text>
+      <text x="222" y="432" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb"> 5. DECIDE</text>
+      <text x="240" y="449" text-anchor="middle" font-size="9" fill="#4a6080">Goal met? Exit.</text>
+      <text x="240" y="462" text-anchor="middle" font-size="9" fill="#4a6080">Not met? Loop.</text>
+    </g>
+
+    <!-- AGENT RUNS THIS label in center -->
+    <text id="lbl-agent1" x="450" y="432" text-anchor="middle" font-size="13" font-weight="800" letter-spacing=".08em" fill="#1e3a5f">AGENT</text>
+    <text id="lbl-agent2" x="450" y="450" text-anchor="middle" font-size="13" font-weight="800" letter-spacing=".08em" fill="#1e3a5f">RUNS THIS</text>
+
+    <!-- Arrow from Design bottom to DISCOVER -->
+    <path id="a-launch-ring" d="M450,215 L450,316" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)" stroke-dasharray="6 4"/>
+
+    <!-- Packets -->
+    <circle id="pkt-main" cx="-100" cy="-100" r="6" fill="#43c6ac" opacity="0"/>
+    <circle id="pkt-loop" cx="-100" cy="-100" r="5" fill="#43c6ac" opacity="0"/>
+    <!-- Trail dots -->
+    <circle id="tr0" cx="-100" cy="-100" r="3" fill="#43c6ac" opacity="0"/>
+    <circle id="tr1" cx="-100" cy="-100" r="2.5" fill="#43c6ac" opacity="0"/>
+    <circle id="tr2" cx="-100" cy="-100" r="2" fill="#43c6ac" opacity="0"/>
+  </svg>
+  </div>
+
+  <div class="footer">
+    <div class="banner" id="banner"></div>
+    <div class="stepper">
+      <div class="step" id="st-setup"><div class="step-n">00</div><div class="step-l">Design</div></div>
+      <div class="step" id="st-0"><div class="step-n">01</div><div class="step-l">Discover</div></div>
+      <div class="step" id="st-1"><div class="step-n">02</div><div class="step-l">Act</div></div>
+      <div class="step" id="st-2"><div class="step-n">03</div><div class="step-l">Verify</div></div>
+      <div class="step" id="st-3"><div class="step-n">04</div><div class="step-l">Remember</div></div>
+      <div class="step" id="st-4"><div class="step-n">05</div><div class="step-l">Decide</div></div>
+    </div>
+  </div>
+</div>
+<div class="gflash exit" id="flash-exit" style="left:50%;top:42%">✓ GOAL MET — EXITING</div>
+<div class="gflash loop" id="flash-loop" style="left:50%;top:42%">↺ NOT MET — LOOPING AGAIN</div>
+
+<script>
+(function(){
+'use strict';
+
+var C = {
+  dim:'#1e3a5f', text:'#8899bb', dimText:'#4a6080',
+  agent:'#43c6ac', human:'#f9c74f',
+  s0:'#43c6ac', s1:'#ffb347', s2:'#69f0ae', s3:'#b39dff', s4:'#f9c74f'
+};
+var STEP_COLORS = [C.agent, C.s0, C.s1, C.s2, C.s3, C.s4];
+var NODE_COLORS = [C.s0, C.s1, C.s2, C.s3, C.s4];
+
+// Timing (seconds in a full cycle)
+var CYCLE = 36;
+// phase: [id, start, end, stepIdx, bannerText, color]
+var PHASES = [
+  ['design',   0,   5,   0, 'You design the loop — define goal, rules, exit condition',  C.human],
+  ['launch',   5,   8,   0, 'Launching the loop — agent takes over',                      C.agent],
+  ['s0',       8,  13,   1, '1. DISCOVER — Finding the next task',                        C.s0],
+  ['s1',      13,  18,   2, '2. ACT — Running the code, making the change',               C.s1],
+  ['s2',      18,  23,   3, '3. VERIFY — Did it work? Tests pass?',                       C.s2],
+  ['s3',      23,  27,   4, '4. REMEMBER — Storing what happened',                        C.s3],
+  ['s4-loop', 27,  31,   5, '5. DECIDE — Goal not met yet, looping again...',             C.s4],
+  ['s4-exit', 31,  36,   5, '5. DECIDE — Goal met! Exiting.',                             C.s2]
+];
+
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function norm(t,s,e){return clamp((t-s)/(e-s),0,1);}
+function eio(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+
+function el(id){return document.getElementById(id);}
+
+var bannerEl = el('banner');
+var flashExit = el('flash-exit');
+var flashLoop = el('flash-loop');
+var stepEls = [el('st-setup'),el('st-0'),el('st-1'),el('st-2'),el('st-3'),el('st-4')];
+
+var nodes = {
+  you:    el('n-you'),
+  design: el('n-design'),
+  s0:     el('n-s0'),
+  s1:     el('n-s1'),
+  s2:     el('n-s2'),
+  s3:     el('n-s3'),
+  s4:     el('n-s4')
+};
+var arrows = {
+  youDesign:    el('a-you-design'),
+  designLaunch: el('a-design-launch'),
+  launchRing:   el('a-launch-ring'),
+  a01: el('a-0-1'), a12: el('a-1-2'),
+  a23: el('a-2-3'), a34: el('a-3-4'), a40: el('a-4-0')
+};
+var agentLbl1 = el('lbl-agent1');
+var agentLbl2 = el('lbl-agent2');
+var ringOutline = el('ring-outline');
+
+var pktMain = el('pkt-main');
+var pktLoop = el('pkt-loop');
+var trails = [el('tr0'), el('tr1'), el('tr2')];
+
+// Path cache for getPointAtLength
+var pathCache = {};
+function getPath(id){if(!pathCache[id])pathCache[id]=document.getElementById(id);return pathCache[id];}
+
+function pktOnPath(pktEl, pathId, t, color, r){
+  var p = getPath(pathId); if(!p) return;
+  var pt = p.getPointAtLength(clamp(t,0,1)*p.getTotalLength());
+  pktEl.setAttribute('cx',pt.x); pktEl.setAttribute('cy',pt.y);
+  pktEl.setAttribute('fill',color); pktEl.setAttribute('opacity','1');
+  if(r) pktEl.setAttribute('r',String(r));
+  return pt;
+}
+function hidePkt(pktEl){pktEl.setAttribute('opacity','0');pktEl.setAttribute('cx','-100');pktEl.setAttribute('cy','-100');}
+
+var trailHistory = [];
+function showTrail(pt, color){
+  if(!pt) return;
+  trailHistory.unshift({x:pt.x, y:pt.y});
+  if(trailHistory.length > trails.length+1) trailHistory.pop();
+  trails.forEach(function(t,i){
+    var h = trailHistory[i+1];
+    if(h){t.setAttribute('cx',h.x);t.setAttribute('cy',h.y);t.setAttribute('fill',color);t.setAttribute('opacity',String(0.4*(1-(i+1)/trails.length)));}
+    else hidePkt(t);
+  });
+}
+function hideTrail(){trailHistory=[];trails.forEach(function(t){hidePkt(t);});}
+
+function activateNode(grp, color, intensity){
+  if(!grp) return;
+  intensity = intensity !== undefined ? intensity : 1;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke', color);
+    shape.setAttribute('stroke-width', intensity > 0.5 ? '2.5' : '2');
+    shape.setAttribute('fill','rgba(8,12,24,0.95)');
+    shape.style.filter = intensity > 0.5 ? 'drop-shadow(0 0 6px '+color+')' : '';
+  }
+  var texts = grp.querySelectorAll('text');
+  if(texts[0]) texts[0].setAttribute('fill', intensity > 0.5 ? color : C.text);
+}
+function dimNode(grp){
+  if(!grp) return;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){shape.setAttribute('stroke',C.dim);shape.setAttribute('stroke-width','1.5');shape.style.filter='';shape.setAttribute('fill','#0b0f1a');}
+  var texts = grp.querySelectorAll('text');
+  if(texts[0]) texts[0].setAttribute('fill',C.text);
+  if(texts[1]) texts[1].setAttribute('fill',C.dimText);
+}
+function doneNode(grp, color){
+  if(!grp) return;
+  var shape = grp.querySelector('circle,rect');
+  if(shape){shape.setAttribute('stroke',color);shape.setAttribute('stroke-width','1.8');shape.style.filter='drop-shadow(0 0 4px '+color+'66)';}
+  var texts = grp.querySelectorAll('text');
+  if(texts[0]) texts[0].setAttribute('fill',color);
+}
+
+var arrowOffset = 0;
+function flowArrow(pathEl, color){
+  if(!pathEl) return;
+  pathEl.setAttribute('stroke',color);
+  pathEl.setAttribute('stroke-width','2');
+  pathEl.setAttribute('stroke-dasharray','8 5');
+  pathEl.setAttribute('stroke-dashoffset',String(-(arrowOffset%13)));
+  pathEl.setAttribute('marker-end','url(#arr-act)');
+}
+function dimArrow(pathEl){
+  if(!pathEl) return;
+  pathEl.setAttribute('stroke',C.dim);
+  pathEl.setAttribute('stroke-width','1.5');
+  pathEl.setAttribute('stroke-dasharray','none');
+  pathEl.setAttribute('marker-end','url(#arr)');
+}
+
+function setStep(idx){
+  stepEls.forEach(function(s,i){
+    s.classList.remove('active');
+    s.style.removeProperty('--ac');
+  });
+  if(idx>=0 && idx<stepEls.length){
+    stepEls[idx].classList.add('active');
+    stepEls[idx].style.setProperty('--ac', STEP_COLORS[idx]);
+  }
+}
+
+var lastBanner = '';
+function setBanner(text, color){
+  if(text===lastBanner) return; lastBanner=text;
+  bannerEl.style.opacity='0';
+  setTimeout(function(){bannerEl.textContent=text;bannerEl.style.color=color||C.text;bannerEl.style.opacity='1';},200);
+}
+
+var flashActive = {};
+function flash(type){
+  if(flashActive[type]) return; flashActive[type]=true;
+  var fe = type==='exit' ? flashExit : flashLoop;
+  fe.style.opacity='0';
+  var start=null;
+  function step(ts){
+    if(!start) start=ts;
+    var p=(ts-start)/1800;
+    if(p>=1){fe.style.opacity='0';flashActive[type]=false;return;}
+    fe.style.opacity=p<0.12?String(p/0.12):p>0.70?String(1-(p-0.70)/0.30):'1';
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function resetAll(){
+  for(var k in nodes){if(nodes.hasOwnProperty(k)) dimNode(nodes[k]);}
+  for(var k in arrows){if(arrows.hasOwnProperty(k)) dimArrow(arrows[k]);}
+  hidePkt(pktMain); hidePkt(pktLoop); hideTrail();
+  agentLbl1.setAttribute('fill','#1e3a5f');
+  agentLbl2.setAttribute('fill','#1e3a5f');
+  ringOutline.setAttribute('stroke','#1e2d45');
+}
+
+var startTime = null;
+var prevPhase = null;
+var cycleCount = 0;
+
+// Decide phase alternates: every other cycle shows exit
+function isExitCycle(cycleNum){ return cycleNum % 3 === 0; }
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  if(!startTime) startTime=ts;
+  var elapsed=(ts-startTime)/1000;
+  var t=elapsed%CYCLE;
+  cycleCount=Math.floor(elapsed/CYCLE);
+  arrowOffset+=0.20;
+
+  // find phase
+  var phase=PHASES[PHASES.length-1];
+  for(var i=0;i<PHASES.length;i++){
+    if(PHASES[i][0]==='s4-loop' && isExitCycle(cycleCount)) continue;
+    if(PHASES[i][0]==='s4-exit' && !isExitCycle(cycleCount)) continue;
+    if(t>=PHASES[i][1] && t<PHASES[i][2]){phase=PHASES[i];break;}
+  }
+
+  if(phase[0]!==prevPhase){prevPhase=phase[0];resetAll();}
+
+  var id=phase[0], ps=phase[1], pe=phase[2];
+  var p=norm(t,ps,pe), ep=eio(p);
+
+  setStep(phase[3]);
+  setBanner(phase[4], phase[5]);
+
+  if(id==='design'){
+    activateNode(nodes.you, C.human, ep);
+    activateNode(nodes.design, C.human, ep*0.7);
+    flowArrow(arrows.youDesign, C.human);
+    if(ep>0.3) {var pt=pktOnPath(pktMain,'a-you-design',(ep-0.3)/0.7,C.human,6); showTrail(pt,C.human);}
+    else hidePkt(pktMain);
+
+  } else if(id==='launch'){
+    doneNode(nodes.you, C.human);
+    doneNode(nodes.design, C.human);
+    flowArrow(arrows.designLaunch, C.agent);
+    flowArrow(arrows.launchRing, C.agent);
+    // packet travels design→launch→ring entrance
+    var segA=norm(ep,0,0.5), segB=norm(ep,0.5,1);
+    if(ep<=0.5){var pt=pktOnPath(pktMain,'a-design-launch',eio(segA*2),C.agent,6);showTrail(pt,C.agent);}
+    else {var pt=pktOnPath(pktMain,'a-launch-ring',eio(segB),C.agent,6);showTrail(pt,C.agent);}
+    // fade in agent label
+    var agCol='rgba(67,198,172,'+Math.round(ep*0.5*100)/100+')';
+    agentLbl1.setAttribute('fill',agCol); agentLbl2.setAttribute('fill',agCol);
+    ringOutline.setAttribute('stroke','rgba(67,198,172,'+Math.round(ep*0.3*100)/100+')');
+
+  } else if(id==='s0'){
+    doneNode(nodes.you, C.human); doneNode(nodes.design, C.human);
+    activateNode(nodes.s0, C.s0, ep);
+    flowArrow(arrows.launchRing, C.s0+'88');
+    flowArrow(arrows.a40, C.s4+'66');
+    var pt=pktOnPath(pktMain,'a-launch-ring',1,C.s0,6);
+    agentLbl1.setAttribute('fill','rgba(67,198,172,0.5)'); agentLbl2.setAttribute('fill','rgba(67,198,172,0.5)');
+    ringOutline.setAttribute('stroke','rgba(67,198,172,0.2)');
+
+  } else if(id==='s1'){
+    doneNode(nodes.s0, C.s0);
+    activateNode(nodes.s1, C.s1, ep);
+    flowArrow(arrows.a01, C.s1);
+    var pt=pktOnPath(pktMain,'a-0-1',ep,C.s1,6); showTrail(pt,C.s1);
+    agentLbl1.setAttribute('fill','rgba(255,179,71,0.4)'); agentLbl2.setAttribute('fill','rgba(255,179,71,0.4)');
+    ringOutline.setAttribute('stroke','rgba(255,179,71,0.15)');
+
+  } else if(id==='s2'){
+    doneNode(nodes.s0, C.s0); doneNode(nodes.s1, C.s1);
+    activateNode(nodes.s2, C.s2, ep);
+    flowArrow(arrows.a12, C.s2);
+    var pt=pktOnPath(pktMain,'a-1-2',ep,C.s2,6); showTrail(pt,C.s2);
+    agentLbl1.setAttribute('fill','rgba(105,240,174,0.4)'); agentLbl2.setAttribute('fill','rgba(105,240,174,0.4)');
+    ringOutline.setAttribute('stroke','rgba(105,240,174,0.15)');
+
+  } else if(id==='s3'){
+    doneNode(nodes.s0, C.s0); doneNode(nodes.s1, C.s1); doneNode(nodes.s2, C.s2);
+    activateNode(nodes.s3, C.s3, ep);
+    flowArrow(arrows.a23, C.s3);
+    var pt=pktOnPath(pktMain,'a-2-3',ep,C.s3,6); showTrail(pt,C.s3);
+    agentLbl1.setAttribute('fill','rgba(179,157,255,0.4)'); agentLbl2.setAttribute('fill','rgba(179,157,255,0.4)');
+    ringOutline.setAttribute('stroke','rgba(179,157,255,0.15)');
+
+  } else if(id==='s4-loop'){
+    doneNode(nodes.s0, C.s0); doneNode(nodes.s1, C.s1); doneNode(nodes.s2, C.s2); doneNode(nodes.s3, C.s3);
+    activateNode(nodes.s4, C.s4, ep);
+    flowArrow(arrows.a34, C.s4);
+    if(ep < 0.6){var pt=pktOnPath(pktMain,'a-3-4',ep/0.6,C.s4,6);showTrail(pt,C.s4);}
+    else {
+      var pt=pktOnPath(pktMain,'a-4-0',(ep-0.6)/0.4,C.s0,6);showTrail(pt,C.s0);
+      flowArrow(arrows.a40, C.s0);
+    }
+    if(ep>0.5 && !flashActive['loop']) flash('loop');
+    agentLbl1.setAttribute('fill','rgba(249,199,79,0.5)'); agentLbl2.setAttribute('fill','rgba(249,199,79,0.5)');
+    ringOutline.setAttribute('stroke','rgba(249,199,79,0.20)');
+
+  } else if(id==='s4-exit'){
+    doneNode(nodes.s0, C.s0); doneNode(nodes.s1, C.s1); doneNode(nodes.s2, C.s2); doneNode(nodes.s3, C.s3);
+    activateNode(nodes.s4, C.s4, ep);
+    flowArrow(arrows.a34, C.s4);
+    var pt=pktOnPath(pktMain,'a-3-4',Math.min(ep/0.5,1),C.s4,6);showTrail(pt,C.s4);
+    if(ep>0.4) {hidePkt(pktMain);hideTrail();}
+    if(ep>0.35 && !flashActive['exit']) flash('exit');
+    // re-illuminate human/design nodes to show "you stepped back in"
+    if(ep>0.5){
+      activateNode(nodes.you, C.human, (ep-0.5)*2);
+      activateNode(nodes.design, C.human, (ep-0.5));
+    }
+    agentLbl1.setAttribute('fill','rgba(105,240,174,0.35)'); agentLbl2.setAttribute('fill','rgba(105,240,174,0.35)');
+    ringOutline.setAttribute('stroke','rgba(105,240,174,0.25)');
+  }
+}
+
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
