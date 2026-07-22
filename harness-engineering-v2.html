@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Harness Engineering — Human ↔ Agent Delegation Loop</title>
+<style>
+:root{
+  --bg:#0d111a;--text:#dde3f0;--dim:#9daabf;--line:#1e2d42;
+  --human:#ffb347;--agent:#4dd9c4;
+  --skills:#b39dff;--mcp:#f06292;--sub:#69f0ae;
+  --approve:#69f0ae;--refine:#ffb347;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;height:100%;width:100%;overflow:hidden}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:16px 20px 14px}
+.hcard{background:rgba(13,17,26,.88);border:1px solid var(--line);border-radius:14px;padding:14px 20px 12px;backdrop-filter:blur(10px);width:100%;max-width:960px}
+.ey{font-size:10px;letter-spacing:.32em;color:var(--agent);font-weight:700;margin-bottom:5px;text-transform:uppercase;font-family:'JetBrains Mono','Courier New',monospace}
+.ti{font-weight:800;font-size:20px;color:var(--text);margin-bottom:4px}
+.su{font-size:12px;color:var(--dim);line-height:1.6}
+.legend{display:flex;gap:14px;flex-wrap:wrap;margin-top:8px}
+.li{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--text);letter-spacing:.04em}
+.ld{width:7px;height:7px;border-radius:50%;flex:none}
+#svg-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:960px}
+svg{width:100%;height:100%;max-height:calc(100vh - 190px)}
+.footer{width:100%;max-width:960px;display:flex;flex-direction:column;align-items:center;gap:8px}
+.banner{font-size:13px;letter-spacing:.10em;text-transform:uppercase;font-weight:700;color:var(--text);opacity:0;transition:opacity .4s;text-align:center;min-height:18px}
+.stepper{display:flex;align-items:stretch;background:rgba(13,17,26,.92);border:1px solid var(--line);border-radius:12px;padding:10px 4px;width:100%;justify-content:stretch}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:8px 6px;border-right:1px solid var(--line)}
+.step:last-child{border-right:none}
+.step-n{font-size:9px;color:var(--dim);letter-spacing:.14em;margin-bottom:3px;font-family:'JetBrains Mono','Courier New',monospace}
+.step-l{font-size:11px;font-weight:700;letter-spacing:.05em;color:var(--dim);transition:color .3s,text-shadow .3s;text-align:center}
+.step.active .step-l{color:#fff}
+.step.active .step-n{color:var(--ac,var(--agent))}
+.gflash{position:fixed;pointer-events:none;font-size:14px;font-weight:800;letter-spacing:.12em;transform:translate(-50%,-50%);opacity:0;z-index:20;white-space:nowrap;border-radius:10px;padding:7px 16px;backdrop-filter:blur(8px)}
+.gflash.approve{color:var(--approve);border:1px solid var(--approve);background:rgba(13,17,26,.90);box-shadow:0 0 18px rgba(105,240,174,.25)}
+.gflash.refine{color:var(--refine);border:1px solid var(--refine);background:rgba(13,17,26,.90);box-shadow:0 0 18px rgba(255,179,71,.25)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hcard">
+    <div class="ey">Harness Engineering</div>
+    <div class="ti">The Human &#8596; Agent Delegation Loop</div>
+    <div class="su">Human provides intent and delegates. Agent orchestrates — using Skills, MCP tools, and Subagents — then returns results. Human validates and either approves or asks the agent to refine.</div>
+    <div class="legend">
+      <div class="li"><div class="ld" style="background:#ffb347"></div>Human</div>
+      <div class="li"><div class="ld" style="background:#4dd9c4"></div>Agent</div>
+      <div class="li"><div class="ld" style="background:#b39dff"></div>Skills</div>
+      <div class="li"><div class="ld" style="background:#f06292"></div>MCP</div>
+      <div class="li"><div class="ld" style="background:#69f0ae"></div>Subagents</div>
+      <div class="li"><div class="ld" style="background:#69f0ae"></div>Approve</div>
+      <div class="li"><div class="ld" style="background:#ffb347"></div>Refine</div>
+    </div>
+  </div>
+  <div id="svg-wrap">
+  <svg viewBox="0 0 960 640" xmlns="http://www.w3.org/2000/svg" id="mainsvg">
+    <defs>
+      <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto">
+        <polygon points="0 0,7 3.5,0 7" fill="#1e2d42"/>
+      </marker>
+      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <!-- background grid -->
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0L0 0 0 40" fill="none" stroke="#111e30" stroke-width="0.5"/>
+    </pattern>
+    <rect width="960" height="640" fill="url(#grid)"/>
+
+    <!-- ══ COLUMN LABELS ══ -->
+    <text x="160" y="24" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".18em" fill="#ffb347" opacity="0.55">HUMAN</text>
+    <text x="480" y="24" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".18em" fill="#4dd9c4" opacity="0.55">AGENT</text>
+    <text x="800" y="24" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".18em" fill="#9daabf" opacity="0.45">TOOLS</text>
+
+    <!-- ══ VERTICAL LANE DIVIDERS ══ -->
+    <line x1="320" y1="30" x2="320" y2="620" stroke="#1e2d42" stroke-width="0.8" stroke-dasharray="4 6" opacity="0.5"/>
+    <line x1="640" y1="30" x2="640" y2="620" stroke="#1e2d42" stroke-width="0.8" stroke-dasharray="4 6" opacity="0.5"/>
+
+    <!-- ══ MAIN FLOW ARROWS ══ -->
+    <!-- Intent → Delegate -->
+    <path id="a-intent-del"  d="M480,78  L480,108" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Delegate → Gate-D -->
+    <path id="a-del-gated"   d="M480,152 L480,188" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Gate-D → Execute -->
+    <path id="a-gated-exec"  d="M480,232 L480,262" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Execute → Return Results -->
+    <path id="a-exec-ret"    d="M480,306 L480,368" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Return Results → Gate-V -->
+    <path id="a-ret-gatev"   d="M480,412 L480,450" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- Gate-V → Done -->
+    <path id="a-gatev-done"  d="M480,494 L480,524" stroke="#1e2d42" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+    <!-- ══ GATE HORIZONTAL CONNECTORS (to human column) ══ -->
+    <!-- Gate-D: human confirms task scope -->
+    <path id="a-gate-d-h" d="M436,210 L320,210" stroke="#1e2d42" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <!-- Gate-V: human validates results -->
+    <path id="a-gate-v-h" d="M436,472 L320,472" stroke="#1e2d42" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+
+    <!-- ══ TOOL BRANCH ARROWS (from Execute) ══ -->
+    <path id="a-exec-sk"  d="M524,279 C600,279 660,122 720,122" stroke="#1e2d42" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-mcp" d="M524,284 C610,284 660,175 720,175" stroke="#1e2d42" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-sub" d="M524,289 C610,289 660,228 720,228" stroke="#1e2d42" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+
+    <!-- ══ REFINE LOOP: Gate-V back to Execute (dashed arc, right side) ══ -->
+    <path id="a-refine-loop" d="M524,472 C700,472 700,284 524,284" stroke="#1e2d42" stroke-width="1.2" stroke-dasharray="3 5" fill="none" marker-end="url(#arr)" opacity="0.4"/>
+    <text x="714" y="382" text-anchor="middle" font-size="8" letter-spacing=".06em" fill="#4a5f7a" opacity="0.6">REFINE</text>
+
+    <!-- ══ AGENT COLUMN NODES ══ -->
+    <!-- 1. Human Intent -->
+    <g id="n-intent">
+      <circle cx="480" cy="56" r="22" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="52" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".08em" fill="#9daabf">HUMAN</text>
+      <text x="480" y="64" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".08em" fill="#9daabf">INTENT</text>
+    </g>
+    <!-- 2. Delegate -->
+    <g id="n-del">
+      <rect x="370" y="108" width="220" height="44" rx="8" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="125" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#9daabf">DELEGATE</text>
+      <text x="480" y="141" text-anchor="middle" font-size="9" fill="#3a5070">human assigns task to agent</text>
+    </g>
+    <!-- 3. Gate-D — Human confirms scope -->
+    <g id="n-gated">
+      <circle cx="480" cy="210" r="22" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="206" text-anchor="middle" font-size="9" fill="#9daabf">GATE</text>
+      <text x="480" y="218" text-anchor="middle" font-size="9" font-weight="700" fill="#9daabf">D</text>
+    </g>
+    <!-- 4. Execute -->
+    <g id="n-exec">
+      <rect x="370" y="262" width="220" height="44" rx="8" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="279" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#9daabf">EXECUTE</text>
+      <text x="480" y="295" text-anchor="middle" font-size="9" fill="#3a5070">Skills · MCP · Subagents</text>
+    </g>
+    <!-- 5. Return Results -->
+    <g id="n-ret">
+      <rect x="370" y="368" width="220" height="44" rx="8" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="385" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#9daabf">RETURN RESULTS</text>
+      <text x="480" y="401" text-anchor="middle" font-size="9" fill="#3a5070">agent delivers output to human</text>
+    </g>
+    <!-- 6. Gate-V — Human validates -->
+    <g id="n-gatev">
+      <circle cx="480" cy="472" r="22" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="468" text-anchor="middle" font-size="9" fill="#9daabf">GATE</text>
+      <text x="480" y="480" text-anchor="middle" font-size="9" font-weight="700" fill="#9daabf">V</text>
+    </g>
+    <!-- 7. Done -->
+    <g id="n-done">
+      <circle cx="480" cy="546" r="22" fill="#0d111a" stroke="#1e2d42" stroke-width="2"/>
+      <text x="480" y="542" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".08em" fill="#9daabf">TASK</text>
+      <text x="480" y="554" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".08em" fill="#9daabf">DONE</text>
+    </g>
+
+    <!-- ══ HUMAN REVIEW NODES (left column) ══ -->
+    <!-- At Gate-D level: human confirms task scope -->
+    <g id="n-hrev-d">
+      <rect x="56" y="190" width="150" height="40" rx="7" fill="#0d111a" stroke="#1e2d42" stroke-width="1.5"/>
+      <text x="131" y="206" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".05em" fill="#9daabf">CONFIRM SCOPE</text>
+      <text x="131" y="220" text-anchor="middle" font-size="9" fill="#3a5070">approve / refine</text>
+    </g>
+    <!-- At Gate-V level: human validates results — approve or refine -->
+    <g id="n-hrev-v">
+      <rect x="56" y="452" width="150" height="40" rx="7" fill="#0d111a" stroke="#1e2d42" stroke-width="1.5"/>
+      <text x="131" y="468" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".05em" fill="#9daabf">VALIDATE</text>
+      <text x="131" y="482" text-anchor="middle" font-size="9" fill="#3a5070">approve / ask to refine</text>
+    </g>
+
+    <!-- ══ TOOL NODES (right column) ══ -->
+    <g id="n-skills">
+      <rect x="720" y="100" width="130" height="44" rx="7" fill="#0d111a" stroke="#1e2d42" stroke-width="1.5"/>
+      <text x="785" y="117" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#9daabf">SKILLS</text>
+      <text x="785" y="133" text-anchor="middle" font-size="9" fill="#3a5070">domain knowledge</text>
+    </g>
+    <g id="n-mcp">
+      <rect x="720" y="153" width="130" height="44" rx="7" fill="#0d111a" stroke="#1e2d42" stroke-width="1.5"/>
+      <text x="785" y="170" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#9daabf">MCP TOOLS</text>
+      <text x="785" y="186" text-anchor="middle" font-size="9" fill="#3a5070">external APIs</text>
+    </g>
+    <g id="n-sub">
+      <rect x="720" y="206" width="130" height="44" rx="7" fill="#0d111a" stroke="#1e2d42" stroke-width="1.5"/>
+      <text x="785" y="223" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#9daabf">SUBAGENTS</text>
+      <text x="785" y="239" text-anchor="middle" font-size="9" fill="#3a5070">parallel execution</text>
+    </g>
+
+    <!-- ══ MOVING PACKETS ══ -->
+    <circle id="packet"    cx="-100" cy="-100" r="6" fill="#4dd9c4" opacity="0"/>
+    <circle id="pkt-human" cx="-100" cy="-100" r="5" fill="#ffb347" opacity="0"/>
+    <circle id="pkt-tools" cx="-100" cy="-100" r="4" fill="#b39dff" opacity="0"/>
+    <circle id="pkt-mcp"   cx="-100" cy="-100" r="4" fill="#f06292" opacity="0"/>
+    <circle id="pkt-sub"   cx="-100" cy="-100" r="4" fill="#69f0ae" opacity="0"/>
+  </svg>
+  </div>
+
+  <div class="footer">
+    <div class="banner" id="banner"></div>
+    <div class="stepper">
+      <div class="step" id="st0"><div class="step-n">01</div><div class="step-l">Intent</div></div>
+      <div class="step" id="st1"><div class="step-n">02</div><div class="step-l">Delegate</div></div>
+      <div class="step" id="st2"><div class="step-n">03</div><div class="step-l">Execute</div></div>
+      <div class="step" id="st3"><div class="step-n">04</div><div class="step-l">Return</div></div>
+      <div class="step" id="st4"><div class="step-n">05</div><div class="step-l">Validate</div></div>
+    </div>
+  </div>
+</div>
+<div class="gflash approve" id="flash-approve" style="left:50%;top:40%">&#10003; APPROVED</div>
+<div class="gflash refine"  id="flash-refine"  style="left:50%;top:40%">&#8634; REFINE</div>
+<script>
+(function(){
+'use strict';
+var C={
+  dim:'#1e2d42',text:'#9daabf',agent:'#4dd9c4',human:'#ffb347',
+  skills:'#b39dff',mcp:'#f06292',sub:'#69f0ae',
+  approve:'#69f0ae',refine:'#ffb347',dimText:'#3a5070'
+};
+var CYCLE=38;
+// Phases: [id, start, end, stepIdx, bannerText, color]
+var PHASES=[
+  ['intent',  0,   4,  0, 'Human formulates intent & goals',                         C.human],
+  ['deleg',   4,   8,  1, 'Human delegates task to Agent',                           C.human],
+  ['gated',   8,  11,  1, 'Gate D — Human confirms scope & approves',                C.human],
+  ['execSk', 11,  16,  2, 'Agent activates Skills — domain knowledge',               C.skills],
+  ['execMcp',16,  21,  2, 'Agent calls MCP Tools — external APIs',                   C.mcp],
+  ['execSub',21,  26,  2, 'Agent spawns Subagents — parallel execution',             C.sub],
+  ['ret',    26,  31,  3, 'Agent returns results to Human',                          C.agent],
+  ['validate',31, 38,  4, 'Human validates — approve or ask Agent to refine',        C.human]
+];
+
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function norm(t,s,e){return clamp((t-s)/(e-s),0,1);}
+function eio(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+function el(id){return document.getElementById(id);}
+
+var bannerEl=el('banner');
+var flashApprove=el('flash-approve');
+var flashRefine=el('flash-refine');
+var stepEls=[el('st0'),el('st1'),el('st2'),el('st3'),el('st4')];
+
+var nodes={
+  intent:el('n-intent'),
+  del:el('n-del'),
+  gated:el('n-gated'), hrevD:el('n-hrev-d'),
+  exec:el('n-exec'),
+  ret:el('n-ret'),
+  gatev:el('n-gatev'), hrevV:el('n-hrev-v'),
+  done:el('n-done'),
+  skills:el('n-skills'),mcp:el('n-mcp'),sub:el('n-sub')
+};
+var arrows={
+  intentDel: el('a-intent-del'),
+  delGated:  el('a-del-gated'),
+  gatedExec: el('a-gated-exec'),
+  execRet:   el('a-exec-ret'),
+  retGatev:  el('a-ret-gatev'),
+  gatevDone: el('a-gatev-done'),
+  gateDH:    el('a-gate-d-h'),
+  gateVH:    el('a-gate-v-h'),
+  execSk:    el('a-exec-sk'),
+  execMcp:   el('a-exec-mcp'),
+  execSub:   el('a-exec-sub'),
+  refineLoop:el('a-refine-loop')
+};
+var pkts={
+  main: el('packet'), human:el('pkt-human'),
+  tools:el('pkt-tools'), mcp:el('pkt-mcp'), sub:el('pkt-sub')
+};
+
+var pathCache={};
+function getPath(id){if(!pathCache[id])pathCache[id]=document.getElementById(id);return pathCache[id];}
+function pktOnPath(pktEl,pathId,t,color){
+  var p=getPath(pathId);if(!p)return;
+  var len=p.getTotalLength();
+  var pt=p.getPointAtLength(clamp(t,0,1)*len);
+  pktEl.setAttribute('cx',pt.x);pktEl.setAttribute('cy',pt.y);
+  pktEl.setAttribute('fill',color);pktEl.setAttribute('opacity','1');
+}
+function hidePkt(pktEl){pktEl.setAttribute('opacity','0');pktEl.setAttribute('cx','-100');pktEl.setAttribute('cy','-100');}
+
+function activateNode(grp,color,intensity){
+  if(!grp)return; intensity=intensity!==undefined?intensity:1;
+  var shape=grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke',color);
+    shape.setAttribute('stroke-width',intensity>0.5?'2.5':'2');
+    shape.setAttribute('fill','rgba(13,17,26,0.95)');
+    shape.style.filter=intensity>0.5?'drop-shadow(0 0 6px '+color+')':'';
+  }
+  var texts=grp.querySelectorAll('text');
+  if(texts[0])texts[0].setAttribute('fill',intensity>0.5?color:C.text);
+}
+function dimNode(grp){
+  if(!grp)return;
+  var shape=grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke',C.dim);shape.setAttribute('stroke-width','1.5');
+    shape.removeAttribute('filter');shape.style.filter='';shape.setAttribute('fill','#0d111a');
+  }
+  var texts=grp.querySelectorAll('text');
+  if(texts[0])texts[0].setAttribute('fill',C.text);
+  if(texts[1])texts[1].setAttribute('fill',C.dimText);
+}
+function doneNode(grp,color){
+  if(!grp)return;
+  var shape=grp.querySelector('circle,rect');
+  if(shape){
+    shape.setAttribute('stroke',color);shape.setAttribute('stroke-width','1.8');
+    shape.style.filter='drop-shadow(0 0 4px '+color+'66)';
+  }
+  var texts=grp.querySelectorAll('text');
+  if(texts[0])texts[0].setAttribute('fill',color);
+}
+function flowArrow(pathEl,color,offset){
+  if(!pathEl)return;
+  pathEl.setAttribute('stroke',color);pathEl.setAttribute('stroke-width','2');
+  pathEl.setAttribute('stroke-dasharray','8 5');
+  pathEl.setAttribute('stroke-dashoffset',String(-offset%13));
+}
+function dimArrow(pathEl){if(!pathEl)return;pathEl.setAttribute('stroke',C.dim);pathEl.setAttribute('stroke-width','1.5');pathEl.setAttribute('stroke-dasharray','none');}
+function dimDashArrow(pathEl){if(!pathEl)return;pathEl.setAttribute('stroke',C.dim);pathEl.setAttribute('stroke-width','1.5');pathEl.setAttribute('opacity','0.4');}
+function restoreDashOpacity(pathEl){if(!pathEl)return;pathEl.setAttribute('opacity','1');}
+
+var STEP_COLORS=[C.human,C.human,C.agent,C.agent,C.human];
+function setStep(idx){
+  stepEls.forEach(function(s){s.classList.remove('active');s.style.removeProperty('--ac');});
+  if(idx>=0&&idx<stepEls.length){stepEls[idx].classList.add('active');stepEls[idx].style.setProperty('--ac',STEP_COLORS[idx]);}
+}
+var lastBanner='';
+function setBanner(text,color){
+  if(text===lastBanner)return; lastBanner=text;
+  bannerEl.style.opacity='0';
+  setTimeout(function(){bannerEl.textContent=text;bannerEl.style.color=color||C.text;bannerEl.style.opacity='1';},200);
+}
+
+var flashActive={};
+function flash(type,gateNodeEl){
+  if(flashActive[type])return; flashActive[type]=true;
+  var elF=type==='approve'?flashApprove:flashRefine;
+  if(gateNodeEl){
+    var circle=gateNodeEl.querySelector('circle');
+    if(circle){var r=circle.getBoundingClientRect();elF.style.left=(r.left+r.width/2)+'px';elF.style.top=(r.top+r.height/2)+'px';}
+  }
+  elF.style.opacity='0';
+  var start=null;
+  function step(ts){
+    if(!start)start=ts; var p=(ts-start)/1800;
+    if(p>=1){elF.style.opacity='0';flashActive[type]=false;return;}
+    elF.style.opacity=p<0.1?String(p/0.1):p>0.65?String(1-(p-0.65)/0.35):'1';
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+}
+
+function resetAll(){
+  for(var k in nodes){if(nodes.hasOwnProperty(k))dimNode(nodes[k]);}
+  for(var k in arrows){
+    if(!arrows.hasOwnProperty(k))continue;
+    var dashed=['gateDH','gateVH','execSk','execMcp','execSub','refineLoop'];
+    if(dashed.indexOf(k)>=0){dimDashArrow(arrows[k]);}else{dimArrow(arrows[k]);}
+  }
+  for(var k in pkts){if(pkts.hasOwnProperty(k))hidePkt(pkts[k]);}
+}
+
+var startTime=null,arrowOffset=0,prevPhase=null,gateFlashed={},cycleNum=0;
+// Alternate between approve and refine at Gate-V each cycle
+// Odd cycles → approve, Even cycles → refine
+function validateFlashType(){return cycleNum%2===0?'refine':'approve';}
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  if(!startTime)startTime=ts;
+  var elapsed=(ts-startTime)/1000;
+  var t=elapsed%CYCLE;
+  cycleNum=Math.floor(elapsed/CYCLE);
+  arrowOffset+=0.18;
+
+  var phase=PHASES[PHASES.length-1];
+  for(var i=0;i<PHASES.length;i++){
+    if(t>=PHASES[i][1]&&t<PHASES[i][2]){phase=PHASES[i];break;}
+  }
+  if(phase[0]!==prevPhase){
+    prevPhase=phase[0];
+    gateFlashed[phase[0]]=false;
+    resetAll();
+  }
+
+  var id=phase[0];
+  var p=norm(t,phase[1],phase[2]);
+  var ep=eio(p);
+  setStep(phase[3]);
+  setBanner(phase[4],phase[5]);
+
+  // ── PHASES ──────────────────────────────────────────────────
+
+  if(id==='intent'){
+    activateNode(nodes.intent,C.human,ep);
+    flowArrow(arrows.intentDel,C.human+'44',arrowOffset);
+    if(ep>0.5) pktOnPath(pkts.main,'a-intent-del',(ep-0.5)/0.5,C.human);
+    else hidePkt(pkts.main);
+
+  } else if(id==='deleg'){
+    doneNode(nodes.intent,C.human);
+    activateNode(nodes.del,C.human,ep);
+    flowArrow(arrows.intentDel,C.human,arrowOffset);
+    flowArrow(arrows.delGated,C.human+'44',arrowOffset);
+    pktOnPath(pkts.main,'a-intent-del',1,C.human);
+
+  } else if(id==='gated'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    activateNode(nodes.gated,C.human,ep);
+    activateNode(nodes.hrevD,C.human,ep);
+    flowArrow(arrows.delGated,C.human,arrowOffset);
+    flowArrow(arrows.gateDH,C.human,arrowOffset*0.4);
+    restoreDashOpacity(arrows.gateDH);
+    flowArrow(arrows.gatedExec,C.human+'44',arrowOffset);
+    pktOnPath(pkts.human,'a-gate-d-h',ep,C.human);
+    if(ep>0.6&&!gateFlashed['gated']){
+      gateFlashed['gated']=true;
+      flash('approve',nodes.gated);
+    }
+
+  } else if(id==='execSk'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    doneNode(nodes.gated,C.human); doneNode(nodes.hrevD,C.human);
+    activateNode(nodes.exec,C.agent,ep);
+    activateNode(nodes.skills,C.skills,ep);
+    flowArrow(arrows.gatedExec,C.agent,arrowOffset);
+    flowArrow(arrows.execRet,C.agent+'44',arrowOffset);
+    flowArrow(arrows.execSk,C.skills,arrowOffset*0.6);
+    restoreDashOpacity(arrows.execSk);
+    pktOnPath(pkts.main,'a-gated-exec',ep,C.agent);
+    pktOnPath(pkts.tools,'a-exec-sk',eio(ep),C.skills);
+
+  } else if(id==='execMcp'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    doneNode(nodes.gated,C.human); doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.skills,C.skills);
+    activateNode(nodes.exec,C.agent,ep);
+    activateNode(nodes.mcp,C.mcp,ep);
+    flowArrow(arrows.gatedExec,C.agent,arrowOffset);
+    flowArrow(arrows.execRet,C.agent+'44',arrowOffset);
+    flowArrow(arrows.execMcp,C.mcp,arrowOffset*0.6);
+    restoreDashOpacity(arrows.execMcp);
+    pktOnPath(pkts.main,'a-gated-exec',1,C.agent);
+    pktOnPath(pkts.mcp,'a-exec-mcp',eio(ep),C.mcp);
+
+  } else if(id==='execSub'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    doneNode(nodes.gated,C.human); doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.skills,C.skills); doneNode(nodes.mcp,C.mcp);
+    activateNode(nodes.exec,C.agent,ep);
+    activateNode(nodes.sub,C.sub,ep);
+    flowArrow(arrows.gatedExec,C.agent,arrowOffset);
+    flowArrow(arrows.execRet,C.agent+'44',arrowOffset);
+    flowArrow(arrows.execSub,C.sub,arrowOffset*0.6);
+    restoreDashOpacity(arrows.execSub);
+    pktOnPath(pkts.main,'a-gated-exec',1,C.agent);
+    pktOnPath(pkts.sub,'a-exec-sub',eio(ep),C.sub);
+
+  } else if(id==='ret'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    doneNode(nodes.gated,C.human); doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.exec,C.agent);
+    doneNode(nodes.skills,C.skills); doneNode(nodes.mcp,C.mcp); doneNode(nodes.sub,C.sub);
+    activateNode(nodes.ret,C.agent,ep);
+    flowArrow(arrows.execRet,C.agent,arrowOffset);
+    flowArrow(arrows.retGatev,C.agent+'44',arrowOffset);
+    pktOnPath(pkts.main,'a-exec-ret',ep,C.agent);
+
+  } else if(id==='validate'){
+    doneNode(nodes.intent,C.human); doneNode(nodes.del,C.human);
+    doneNode(nodes.gated,C.human); doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.exec,C.agent); doneNode(nodes.ret,C.agent);
+    doneNode(nodes.skills,C.skills); doneNode(nodes.mcp,C.mcp); doneNode(nodes.sub,C.sub);
+    // Gate-V is HUMAN validate
+    activateNode(nodes.gatev,C.human,ep);
+    activateNode(nodes.hrevV,C.human,ep);
+    flowArrow(arrows.retGatev,C.human,arrowOffset);
+    flowArrow(arrows.gateVH,C.human,arrowOffset*0.4);
+    restoreDashOpacity(arrows.gateVH);
+    pktOnPath(pkts.human,'a-gate-v-h',ep,C.human);
+    // Show refine loop on refine cycles, approve path otherwise
+    var isRefine=validateFlashType()==='refine';
+    if(isRefine){
+      // Animate the refine loop arc
+      var loopEl=arrows.refineLoop;
+      if(loopEl){
+        loopEl.setAttribute('stroke',C.refine);loopEl.setAttribute('stroke-width','1.5');
+        loopEl.setAttribute('stroke-dasharray','5 4');loopEl.setAttribute('opacity','0.7');
+        loopEl.setAttribute('stroke-dashoffset',String(-arrowOffset*0.5%9));
+      }
+    } else {
+      flowArrow(arrows.gatevDone,C.approve+'44',arrowOffset);
+    }
+    // First flash at 40%, second at 75% — approve or refine depending on cycle
+    if(ep>0.35&&!gateFlashed['validate_1']){
+      gateFlashed['validate_1']=true;
+      flash(validateFlashType(),nodes.gatev);
+    }
+    if(ep>0.75&&!gateFlashed['validate_2']){
+      gateFlashed['validate_2']=true;
+      // Second flash is always the other option to show both paths
+      flash(isRefine?'approve':'refine',nodes.gatev);
+    }
+    // Animate to done only on approve cycles
+    if(!isRefine&&ep>0.82){
+      activateNode(nodes.done,C.approve,ep);
+      pktOnPath(pkts.main,'a-gatev-done',(ep-0.82)/0.18,C.approve);
+    }
+  }
+}
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>

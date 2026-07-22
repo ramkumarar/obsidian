@@ -221,8 +221,8 @@ svg{width:100%;height:100%;max-height:calc(100vh - 180px)}
     </div>
   </div>
 </div>
-<div class="gflash approve" id="flash-approve" style="left:50%;top:40%">✓ APPROVED</div>
-<div class="gflash refine"  id="flash-refine"  style="left:50%;top:40%">↺ REFINE</div>
+<div class="gflash approve" id="flash-approve">✓ APPROVED</div>
+<div class="gflash refine"  id="flash-refine">↺ REFINE</div>
 
 <script>
 (function(){
@@ -404,17 +404,39 @@ function setBanner(text, color){
 
 // ── GATE FLASH ───────────────────────────────────────────────────
 var flashActive = {};
-function flash(type){
+function flash(type, gateNode){
   if(flashActive[type]) return;
   flashActive[type] = true;
-  var el = type === 'approve' ? flashApprove : flashRefine;
-  el.style.opacity = '0';
+  var flashEl = type === 'approve' ? flashApprove : flashRefine;
+
+  // Position flash over the given gate node using SVG→screen coords
+  if(gateNode){
+    var shape = gateNode.querySelector('circle,rect');
+    if(shape){
+      var svgEl = document.getElementById('mainsvg');
+      var svgRect = svgEl.getBoundingClientRect();
+      var bb = shape.getBBox();
+      // Centre of the gate in SVG user space
+      var cx = bb.x + bb.width  / 2;
+      var cy = bb.y + bb.height / 2;
+      // Convert to screen pixels via the SVG viewBox → rendered size ratio
+      var vb = svgEl.viewBox.baseVal;
+      var scaleX = svgRect.width  / vb.width;
+      var scaleY = svgRect.height / vb.height;
+      var screenX = svgRect.left + cx * scaleX;
+      var screenY = svgRect.top  + cy * scaleY;
+      flashEl.style.left = screenX + 'px';
+      flashEl.style.top  = screenY + 'px';
+    }
+  }
+
+  flashEl.style.opacity = '0';
   var start = null;
   function step(ts){
     if(!start) start = ts;
     var p = (ts - start) / 1600;
-    if(p >= 1){ el.style.opacity = '0'; flashActive[type] = false; return; }
-    el.style.opacity = p < 0.12 ? String(p/0.12) : p > 0.68 ? String(1-(p-0.68)/0.32) : '1';
+    if(p >= 1){ flashEl.style.opacity = '0'; flashActive[type] = false; return; }
+    flashEl.style.opacity = p < 0.12 ? String(p/0.12) : p > 0.68 ? String(1-(p-0.68)/0.32) : '1';
     requestAnimationFrame(step);
   }
   requestAnimationFrame(step);
@@ -496,7 +518,7 @@ function animate(ts){
     flowArrow(arrows.g1, C.human, arrowOffset*0.4);
     if(ep > 0.6 && !approvedGates['gate1']){
       approvedGates['gate1'] = true;
-      flash('approve');
+      flash('approve', nodes.gate1);
     }
 
   } else if(id === 'design'){
@@ -514,7 +536,7 @@ function animate(ts){
     flowArrow(arrows.g2, C.human, arrowOffset*0.4);
     if(ep > 0.6 && !approvedGates['gate2']){
       approvedGates['gate2'] = true;
-      flash('approve');
+      flash('approve', nodes.gate2);
     }
 
   } else if(id === 'execute'){
@@ -622,7 +644,7 @@ function animate(ts){
     if(ep > 0.65 && !approvedGates['validate']){
       approvedGates['validate'] = true;
       // Odd cycles = refine, even = approve
-      flash(cycleNum % 2 === 1 ? 'refine' : 'approve');
+      flash(cycleNum % 2 === 1 ? 'refine' : 'approve', nodes.gate3);
     }
 
   } else if(id === 'end'){
