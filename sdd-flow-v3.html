@@ -1,0 +1,567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>SDD v3 — Spec-Driven Development Flow</title>
+<style>
+:root{
+  --bg:#0b0f1a;--text:#e2e8f5;--dim:#8899bb;--line:#1e3a5f;
+  --human:#f9c74f;--agent:#43c6ac;
+  --skills:#b39dff;--mcp:#f06292;--sub:#69f0ae;
+  --approve:#69f0ae;--refine:#ffb347;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--text);font-family:'Inter','Segoe UI',system-ui,sans-serif;height:100%;width:100%;overflow:hidden}
+#wrap{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:12px 16px 8px}
+.hcard{background:rgba(8,12,24,.88);border:1px solid var(--line);border-radius:12px;padding:8px 18px 6px;backdrop-filter:blur(10px);width:100%;max-width:1200px}
+.ey{font-size:9px;letter-spacing:.32em;color:var(--agent);font-weight:700;margin-bottom:2px;text-transform:uppercase;font-family:'JetBrains Mono','Courier New',monospace}
+.ti{font-weight:800;font-size:16px;color:var(--text);margin-bottom:1px}
+.su{font-size:10px;color:var(--dim);line-height:1.4}
+.legend{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.li{display:flex;align-items:center;gap:4px;font-size:9px;color:var(--text);letter-spacing:.04em}
+.ld{width:6px;height:6px;border-radius:50%;flex:none}
+#svg-wrap{flex:1;display:flex;align-items:center;justify-content:center;width:100%;max-width:1200px}
+svg{width:100%;height:100%;max-height:calc(100vh - 175px)}
+.footer{width:100%;max-width:1200px;display:flex;flex-direction:column;align-items:center;gap:3px}
+.banner{font-size:11px;letter-spacing:.08em;text-transform:uppercase;font-weight:700;color:var(--text);opacity:0;transition:opacity .4s;text-align:center;min-height:14px}
+.stepper{display:flex;align-items:stretch;background:rgba(8,12,24,.92);border:1px solid var(--line);border-radius:8px;padding:5px 3px;width:100%;justify-content:stretch}
+.stepper.p0{border-color:rgba(249,199,79,.3)}
+.stepper.p1{border-color:rgba(67,198,172,.3)}
+.step{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:4px 3px;border-right:1px solid var(--line)}
+.step:last-child{border-right:none}
+.step-n{font-size:7px;color:var(--dim);letter-spacing:.14em;margin-bottom:1px;font-family:'JetBrains Mono','Courier New',monospace}
+.step-l{font-size:9px;font-weight:700;letter-spacing:.03em;color:var(--dim);transition:color .3s;text-align:center}
+.step.active .step-l{color:#fff}
+.step.active .step-n{color:var(--ac,var(--agent))}
+.phase-label{font-size:8px;letter-spacing:.16em;font-weight:700;text-transform:uppercase;padding:1px 6px;border-radius:3px;align-self:flex-start;margin-bottom:1px}
+.phase-label.p0{color:rgba(249,199,79,.8);background:rgba(249,199,79,.08);border:1px solid rgba(249,199,79,.2)}
+.phase-label.p1{color:rgba(67,198,172,.8);background:rgba(67,198,172,.08);border:1px solid rgba(67,198,172,.2)}
+.gflash{position:fixed;pointer-events:none;font-size:13px;font-weight:800;letter-spacing:.12em;transform:translate(-50%,-50%);opacity:0;z-index:20;white-space:nowrap;border-radius:8px;padding:6px 14px;backdrop-filter:blur(8px)}
+.gflash.approve{color:var(--approve);border:1px solid var(--approve);background:rgba(8,12,24,.90);box-shadow:0 0 16px rgba(105,240,174,.25)}
+.gflash.refine{color:var(--refine);border:1px solid var(--refine);background:rgba(8,12,24,.90);box-shadow:0 0 16px rgba(255,179,71,.25)}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <div class="hcard">
+    <div class="ey">Spec-Driven Development · SDD v3</div>
+    <div class="ti">HLR Decomposition → Per-Component SDD Loop</div>
+    <div class="su">Phase 0: BA · Architect · Principal Engineer + Agent decompose HLR into component specs. Phase 1: Agent drives parallel SDD loops (×N components) — Requirements → Design → Tasks → Execute → Validate.</div>
+    <div class="legend">
+      <div class="li"><div class="ld" style="background:#f9c74f"></div>Human / Collab</div>
+      <div class="li"><div class="ld" style="background:#43c6ac"></div>Agent</div>
+      <div class="li"><div class="ld" style="background:#b39dff"></div>Skills</div>
+      <div class="li"><div class="ld" style="background:#f06292"></div>MCP</div>
+      <div class="li"><div class="ld" style="background:#69f0ae"></div>Subagents</div>
+      <div class="li"><div class="ld" style="background:#69f0ae"></div>Approve</div>
+      <div class="li"><div class="ld" style="background:#ffb347"></div>Refine</div>
+    </div>
+  </div>
+  <div id="svg-wrap">
+  <!-- viewBox: 1200 wide x 1040 tall. Three columns: Left 0-360, Center 360-840, Right 840-1200 -->
+  <svg viewBox="0 0 1200 1040" xmlns="http://www.w3.org/2000/svg" id="mainsvg">
+    <defs>
+      <marker id="arr" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#1e3a5f"/></marker>
+      <marker id="arr-gold" markerWidth="7" markerHeight="7" refX="5" refY="3.5" orient="auto"><polygon points="0 0,7 3.5,0 7" fill="#f9c74f"/></marker>
+      <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+        <feGaussianBlur stdDeviation="3" result="blur"/>
+        <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+    </defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M40 0L0 0 0 40" fill="none" stroke="#0e1828" stroke-width="0.5"/>
+    </pattern>
+    <rect width="1200" height="1040" fill="url(#grid)"/>
+
+    <!-- ══ PHASE ZONES ══ -->
+    <rect x="8" y="44" width="1184" height="390" rx="12" fill="rgba(249,199,79,0.04)" stroke="rgba(249,199,79,0.18)" stroke-width="1.2" stroke-dasharray="6 4"/>
+    <text x="22" y="61" font-size="9" font-weight="700" letter-spacing=".22em" fill="rgba(249,199,79,0.65)">PHASE 0 · HLR DECOMPOSITION</text>
+    <rect x="22" y="66" width="480" height="18" rx="4" fill="rgba(249,199,79,0.07)" stroke="rgba(249,199,79,0.2)" stroke-width="1"/>
+    <text x="30" y="78" font-size="8.5" fill="rgba(249,199,79,0.8)" letter-spacing=".05em">BA · Architect · Principal Engineer · Agent</text>
+
+    <rect x="8" y="444" width="1184" height="586" rx="12" fill="rgba(67,198,172,0.03)" stroke="rgba(67,198,172,0.14)" stroke-width="1.2" stroke-dasharray="6 4"/>
+    <text x="22" y="461" font-size="9" font-weight="700" letter-spacing=".22em" fill="rgba(67,198,172,0.6)">PHASE 1 · COMPONENT SDD LOOP  ×N PARALLEL</text>
+
+    <!-- ══ COLUMN LABELS ══ -->
+    <text x="180" y="96" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".18em" fill="#f9c74f" opacity="0.5">HUMAN / COLLAB</text>
+    <text x="600" y="96" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".18em" fill="#43c6ac" opacity="0.5">AGENT</text>
+    <text x="1020" y="560" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".18em" fill="#8899bb" opacity="0.4">TOOLS</text>
+
+    <!-- ══ LANE DIVIDERS ══ -->
+    <line x1="390" y1="86" x2="390" y2="1030" stroke="#1e3a5f" stroke-width="0.8" stroke-dasharray="4 6" opacity="0.5"/>
+    <line x1="810" y1="86" x2="810" y2="1030" stroke="#1e3a5f" stroke-width="0.8" stroke-dasharray="4 6" opacity="0.5"/>
+
+    <!-- ════════════════════════════════════
+         PHASE 0 — spread across all 3 columns
+         Row 1 (y~180): HLR(left) → LLR Decompose(center) → App Seq Diagram(right)
+         Row 2 (y~300): Component Map(left) ← → Interface Contracts(center) → Per-Comp Req Spec(right)
+         ════════════════════════════════════ -->
+
+    <!-- HLR node — left column -->
+    <g id="n-hlr">
+      <circle cx="180" cy="210" r="34" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="180" y="200" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".07em" fill="#8899bb">PRODUCT</text>
+      <text x="180" y="212" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".07em" fill="#8899bb">OWNER</text>
+      <text x="180" y="224" text-anchor="middle" font-size="8" font-weight="700" letter-spacing=".07em" fill="#4a6080">HLR</text>
+    </g>
+
+    <!-- LLR Decompose — center column -->
+    <g id="n-decompose">
+      <rect x="470" y="188" width="260" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="205" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">LLR DECOMPOSITION</text>
+      <text x="600" y="221" text-anchor="middle" font-size="9" fill="#4a6080">vertical slices of implementation</text>
+    </g>
+
+    <!-- App Sequence Diagram — right column, after Component Map (row 2) -->
+    <g id="n-seqdiag">
+      <rect x="838" y="296" width="200" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="938" y="313" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".05em" fill="#8899bb">APP SEQ DIAGRAM</text>
+      <text x="938" y="329" text-anchor="middle" font-size="9" fill="#4a6080">cross-component flow</text>
+    </g>
+
+    <!-- Component Map — left column row 2 -->
+    <g id="n-compmap">
+      <rect x="46" y="296" width="220" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="156" y="313" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">COMPONENT MAP</text>
+      <text x="156" y="329" text-anchor="middle" font-size="9" fill="#4a6080">Architect · PE-led · impacted components</text>
+    </g>
+
+    <!-- Interface Contracts — center column row 2 -->
+    <g id="n-contracts">
+      <rect x="470" y="296" width="260" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="313" text-anchor="middle" font-size="11" font-weight="700" letter-spacing=".06em" fill="#8899bb">INTERFACE CONTRACTS</text>
+      <text x="600" y="329" text-anchor="middle" font-size="9" fill="#4a6080">API · events · shared models</text>
+    </g>
+
+    <!-- Per-Component Req Spec — right column row 2 -->
+    <g id="n-pcspec">
+      <rect x="828" y="296" width="220" height="44" rx="8" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="938" y="313" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">PER-COMP REQ SPEC</text>
+      <text x="938" y="329" text-anchor="middle" font-size="9" fill="#4a6080">input to SDD loop  ×N</text>
+    </g>
+
+    <!-- ══ PHASE 0 ARROWS ══ -->
+    <!-- HLR → LLR Decompose (horizontal) -->
+    <path id="a-hlr-dec" d="M214,210 L470,210" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- LLR Decompose → App Seq Diagram: REMOVED — seq diagram depends on component map -->
+    <!-- Component Map → App Seq Diagram (horizontal right, same row) -->
+    <path id="a-dec-seq" d="M266,318 L838,318" stroke="#1e3a5f" stroke-width="1.8" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <!-- LLR Decompose → Component Map (diagonal down-left) -->
+    <path id="a-dec-comp" d="M530,232 C450,270 280,286 266,296" stroke="#1e3a5f" stroke-width="1.8" fill="none" marker-end="url(#arr)"/>
+    <!-- LLR Decompose → Interface Contracts (vertical) -->
+    <path id="a-dec-contr" d="M600,232 L600,296" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <!-- LLR Decompose → Per-Comp Req Spec (diagonal down-right) -->
+    <path id="a-dec-pcspec" d="M670,232 C750,270 870,286 880,296" stroke="#1e3a5f" stroke-width="1.8" fill="none" marker-end="url(#arr)"/>
+
+    <!-- Component Map + Contracts + Per-Comp Spec → fan-in to Phase 1 -->
+    <path id="a-comp-p1"   d="M156,340 C156,400 600,430 600,468" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-contr-p1"  d="M600,340 L600,468" stroke="#1e3a5f" stroke-width="2.5" fill="none" marker-end="url(#arr)"/>
+    <path id="a-pcspec-p1" d="M938,340 C938,400 600,430 600,468" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <text x="616" y="412" font-size="9" fill="rgba(249,199,79,0.65)" letter-spacing=".06em">×N</text>
+
+    <!-- ════════════════════════════════════
+         PHASE 1 — center spine, left gates, right tools
+         Spacing: req@490, gate-r@562, des@624, gate-d@696, tasks@758, gate-t@830, exec@892, gate-v@960, done@1018
+         ════════════════════════════════════ -->
+
+    <!-- Phase 1 main spine arrows -->
+    <path id="a-req-gater"   d="M600,534 L600,550" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-gater-des"   d="M600,584 L600,600" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-des-gated"   d="M600,644 L600,660" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-gated-tasks" d="M600,694 L600,710" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-tasks-gatet" d="M600,754 L600,770" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-gatet-exec"  d="M600,804 L600,820" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-gatev"  d="M600,864 L600,880" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+    <path id="a-gatev-done"  d="M600,914 L600,930" stroke="#1e3a5f" stroke-width="2" fill="none" marker-end="url(#arr)"/>
+
+    <!-- Gate horizontal connectors to left human column -->
+    <path id="a-gate-r-h" d="M562,567 L420,567" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <path id="a-gate-d-h" d="M562,677 L420,677" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <path id="a-gate-t-h" d="M562,787 L420,787" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+    <path id="a-gate-v-h" d="M562,897 L420,897" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none"/>
+
+    <!-- Tool branch arrows (center → right) -->
+    <path id="a-req-sk"    d="M660,506 C740,506 848,614 848,614" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-req-mcp"   d="M660,511 C740,511 848,668 848,668" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-req-sub"   d="M660,516 C740,516 848,722 848,722" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-des-sk"    d="M660,617 C740,617 848,628 848,628" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-des-mcp"   d="M660,622 C740,622 848,682 848,682" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-des-sub"   d="M660,627 C740,627 848,736 848,736" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-tasks-sk"  d="M700,727 C760,727 848,640 848,640" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-tasks-sub" d="M700,737 C760,737 848,748 848,748" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-sk"   d="M660,837 C740,837 848,640 848,640" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-mcp"  d="M660,842 C740,842 848,694 848,694" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+    <path id="a-exec-sub"  d="M660,847 C740,847 848,748 848,748" stroke="#1e3a5f" stroke-width="1.5" stroke-dasharray="5 4" fill="none" marker-end="url(#arr)"/>
+
+    <!-- Phase 1 center nodes -->
+    <g id="n-req">
+      <rect x="480" y="468" width="240" height="40" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="483" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">REQUIREMENTS</text>
+      <text x="600" y="498" text-anchor="middle" font-size="8" fill="#4a6080">agent elaborates &amp; details</text>
+    </g>
+    <g id="n-gater">
+      <circle cx="600" cy="567" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="563" text-anchor="middle" font-size="8" fill="#8899bb">GATE</text>
+      <text x="600" y="574" text-anchor="middle" font-size="8" font-weight="700" fill="#8899bb">R</text>
+    </g>
+    <g id="n-des">
+      <rect x="480" y="600" width="240" height="40" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="615" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">DESIGN</text>
+      <text x="600" y="630" text-anchor="middle" font-size="8" fill="#4a6080">component technical design</text>
+    </g>
+    <g id="n-gated">
+      <circle cx="600" cy="677" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="673" text-anchor="middle" font-size="8" fill="#8899bb">GATE</text>
+      <text x="600" y="684" text-anchor="middle" font-size="8" font-weight="700" fill="#8899bb">D</text>
+    </g>
+    <g id="n-tasks">
+      <rect x="480" y="710" width="240" height="40" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="725" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">TASK BREAKDOWN</text>
+      <text x="600" y="740" text-anchor="middle" font-size="8" fill="#4a6080">agent decomposes into tasks</text>
+    </g>
+    <g id="n-gatet">
+      <circle cx="600" cy="787" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="783" text-anchor="middle" font-size="8" fill="#8899bb">GATE</text>
+      <text x="600" y="794" text-anchor="middle" font-size="8" font-weight="700" fill="#8899bb">T</text>
+    </g>
+    <g id="n-exec">
+      <rect x="480" y="820" width="240" height="40" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="835" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">EXECUTE TASK</text>
+      <text x="600" y="850" text-anchor="middle" font-size="8" fill="#4a6080">Skills · MCP · Subagents</text>
+    </g>
+    <g id="n-gatev">
+      <circle cx="600" cy="897" r="17" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="893" text-anchor="middle" font-size="8" fill="#8899bb">GATE</text>
+      <text x="600" y="904" text-anchor="middle" font-size="8" font-weight="700" fill="#8899bb">V</text>
+    </g>
+    <g id="n-done">
+      <rect x="480" y="930" width="240" height="40" rx="7" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="2"/>
+      <text x="600" y="946" text-anchor="middle" font-size="10" font-weight="700" letter-spacing=".06em" fill="#8899bb">VALIDATE</text>
+      <text x="600" y="961" text-anchor="middle" font-size="8" fill="#4a6080">contract tests · pipeline · CI/CD</text>
+    </g>
+
+    <!-- Left human review nodes -->
+    <g id="n-hrev-r">
+      <rect x="234" y="549" width="160" height="36" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="314" y="563" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".05em" fill="#8899bb">REVIEW REQS</text>
+      <text x="314" y="576" text-anchor="middle" font-size="8" fill="#4a6080">approve / refine</text>
+    </g>
+    <g id="n-hrev-d">
+      <rect x="234" y="659" width="160" height="36" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="314" y="673" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".05em" fill="#8899bb">REVIEW DESIGN</text>
+      <text x="314" y="686" text-anchor="middle" font-size="8" fill="#4a6080">approve / refine</text>
+    </g>
+    <g id="n-hrev-t">
+      <rect x="234" y="769" width="160" height="36" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="314" y="783" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".05em" fill="#8899bb">APPROVE TASKS</text>
+      <text x="314" y="796" text-anchor="middle" font-size="8" fill="#4a6080">approve / refine</text>
+    </g>
+    <g id="n-hrev-v">
+      <rect x="234" y="879" width="160" height="36" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="314" y="893" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".05em" fill="#8899bb">VALIDATE</text>
+      <text x="314" y="906" text-anchor="middle" font-size="8" fill="#4a6080">approve / refine</text>
+    </g>
+
+    <!-- Right tool nodes -->
+    <g id="n-skills">
+      <rect x="848" y="602" width="140" height="38" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="918" y="617" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".06em" fill="#8899bb">SKILLS</text>
+      <text x="918" y="631" text-anchor="middle" font-size="8" fill="#4a6080">domain knowledge</text>
+    </g>
+    <g id="n-mcp">
+      <rect x="848" y="656" width="140" height="38" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="918" y="671" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".06em" fill="#8899bb">MCP TOOLS</text>
+      <text x="918" y="685" text-anchor="middle" font-size="8" fill="#4a6080">external APIs</text>
+    </g>
+    <g id="n-sub">
+      <rect x="848" y="710" width="140" height="38" rx="6" fill="#0b0f1a" stroke="#1e3a5f" stroke-width="1.5"/>
+      <text x="918" y="725" text-anchor="middle" font-size="9" font-weight="700" letter-spacing=".06em" fill="#8899bb">SUBAGENTS</text>
+      <text x="918" y="739" text-anchor="middle" font-size="8" fill="#4a6080">parallel execution</text>
+    </g>
+
+    <!-- Moving packets -->
+    <circle id="packet"    cx="-100" cy="-100" r="6" fill="#43c6ac" opacity="0"/>
+    <circle id="pkt-human" cx="-100" cy="-100" r="5" fill="#f9c74f" opacity="0"/>
+    <circle id="pkt-tools" cx="-100" cy="-100" r="4" fill="#b39dff" opacity="0"/>
+    <circle id="pkt-mcp"   cx="-100" cy="-100" r="4" fill="#f06292" opacity="0"/>
+    <circle id="pkt-sub"   cx="-100" cy="-100" r="4" fill="#69f0ae" opacity="0"/>
+    <circle id="pkt-gold"  cx="-100" cy="-100" r="5" fill="#f9c74f" opacity="0"/>
+  </svg>
+  </div>
+
+  <div class="footer">
+    <div class="banner" id="banner"></div>
+    <div class="phase-label p0">Phase 0 · HLR Decomposition</div>
+    <div class="stepper p0">
+      <div class="step" id="p0s0"><div class="step-n">P0·01</div><div class="step-l">HLR</div></div>
+      <div class="step" id="p0s1"><div class="step-n">P0·02</div><div class="step-l">Decompose</div></div>
+      <div class="step" id="p0s2"><div class="step-n">P0·03</div><div class="step-l">Component Map</div></div>
+      <div class="step" id="p0s3"><div class="step-n">P0·04</div><div class="step-l">Contracts</div></div>
+      <div class="step" id="p0s4"><div class="step-n">P0·05</div><div class="step-l">Per-Component Req Spec</div></div>
+    </div>
+    <div class="phase-label p1">Phase 1 · Component SDD Loop ×N Parallel</div>
+    <div class="stepper p1">
+      <div class="step" id="p1s0"><div class="step-n">P1·01</div><div class="step-l">Requirements</div></div>
+      <div class="step" id="p1s1"><div class="step-n">P1·02</div><div class="step-l">Design</div></div>
+      <div class="step" id="p1s2"><div class="step-n">P1·03</div><div class="step-l">Task Breakdown</div></div>
+      <div class="step" id="p1s3"><div class="step-n">P1·04</div><div class="step-l">Execute</div></div>
+      <div class="step" id="p1s4"><div class="step-n">P1·05</div><div class="step-l">Validate</div></div>
+    </div>
+  </div>
+</div>
+<div class="gflash approve" id="flash-approve" style="left:50%;top:40%">✓ APPROVED</div>
+<div class="gflash refine"  id="flash-refine"  style="left:50%;top:40%">↺ REFINE</div>
+<script>
+(function(){
+'use strict';
+var C={dim:'#1e3a5f',text:'#8899bb',agent:'#43c6ac',human:'#f9c74f',skills:'#b39dff',mcp:'#f06292',sub:'#69f0ae',approve:'#69f0ae',refine:'#ffb347',gold:'#f9c74f',dimText:'#4a6080'};
+var CYCLE=30;
+
+var PHASES=[
+  ['hlr',      0,  1.5, [0,-1], 'Product Owner provides HLR',                                                           C.gold],
+  ['decompose',1.5,4.5, [1,-1], 'Collab: BA · Architect · Principal Engineers decompose HLR into LLR vertical slices',  C.gold],
+  ['compmap',  4.5,7.5, [2,-1], 'Collab: Architects · Principal Engineers lead Component Map → App Seq Diagram produced', C.gold],
+  ['contracts',7.5,10.5,[3,-1], 'Collab: BA · Architect · Principal Engineers define Interface Contracts',               C.gold],
+  ['pcspec',   10.5,13.5,[4,-1],'Collab: BA · Architect · Principal Engineers produce Per-Component Req Spec — ×N',     C.gold],
+  ['req',      13.5,16, [-1,0], 'Agent elaborates component requirements — Skills · MCP · Subagents',                   C.agent],
+  ['gater',    16,17.5, [-1,0], 'Gate R — Human reviews requirements',                                                   C.human],
+  ['design',   17.5,20, [-1,1], 'Agent produces component design — Skills · MCP · Subagents',                           C.agent],
+  ['gated',    20,21.5, [-1,1], 'Gate D — Human reviews design',                                                         C.human],
+  ['tasks',    21.5,24, [-1,2], 'Agent breaks design into tasks — Skills · Subagents',                                   C.agent],
+  ['gatet',    24,25.5, [-1,2], 'Gate T — Human approves task breakdown',                                                C.human],
+  ['execute',  25.5,28, [-1,3], 'Agent executes task — Skills · MCP · Subagents',                                        C.agent],
+  ['gatev',    28,30,   [-1,4], 'Gate V — Human validates · contract tests · pipeline · CI/CD',                          C.human]
+];
+
+function clamp(x,a,b){return Math.max(a,Math.min(b,x));}
+function norm(t,s,e){return clamp((t-s)/(e-s),0,1);}
+function eio(x){return x<.5?4*x*x*x:1-Math.pow(-2*x+2,3)/2;}
+function el(id){return document.getElementById(id);}
+
+var bannerEl=el('banner');
+var p0Steps=[el('p0s0'),el('p0s1'),el('p0s2'),el('p0s3'),el('p0s4')];
+var p1Steps=[el('p1s0'),el('p1s1'),el('p1s2'),el('p1s3'),el('p1s4')];
+
+var nodes={
+  hlr:el('n-hlr'),decompose:el('n-decompose'),seqdiag:el('n-seqdiag'),
+  compmap:el('n-compmap'),contracts:el('n-contracts'),pcspec:el('n-pcspec'),
+  req:el('n-req'),gater:el('n-gater'),hrevR:el('n-hrev-r'),
+  des:el('n-des'),gated:el('n-gated'),hrevD:el('n-hrev-d'),
+  tasks:el('n-tasks'),gatet:el('n-gatet'),hrevT:el('n-hrev-t'),
+  exec:el('n-exec'),gatev:el('n-gatev'),hrevV:el('n-hrev-v'),
+  done:el('n-done'),
+  skills:el('n-skills'),mcp:el('n-mcp'),sub:el('n-sub')
+};
+
+var arrows={
+  hlrDec:el('a-hlr-dec'),decSeq:el('a-dec-seq'),decComp:el('a-dec-comp'),
+  decContr:el('a-dec-contr'),decPcspec:el('a-dec-pcspec'),
+  compP1:el('a-comp-p1'),contrP1:el('a-contr-p1'),pcspecP1:el('a-pcspec-p1'),
+  reqGater:el('a-req-gater'),gaterDes:el('a-gater-des'),desGated:el('a-des-gated'),
+  gatedTasks:el('a-gated-tasks'),tasksGatet:el('a-tasks-gatet'),gatatExec:el('a-gatet-exec'),
+  execGatev:el('a-exec-gatev'),gatevDone:el('a-gatev-done'),
+  gateRH:el('a-gate-r-h'),gateDH:el('a-gate-d-h'),gateTH:el('a-gate-t-h'),gateVH:el('a-gate-v-h'),
+  reqSk:el('a-req-sk'),reqMcp:el('a-req-mcp'),reqSub:el('a-req-sub'),
+  desSk:el('a-des-sk'),desMcp:el('a-des-mcp'),desSub:el('a-des-sub'),
+  tasksSk:el('a-tasks-sk'),tasksSub:el('a-tasks-sub'),
+  execSk:el('a-exec-sk'),execMcp:el('a-exec-mcp'),execSub:el('a-exec-sub')
+};
+
+var pkts={main:el('packet'),human:el('pkt-human'),tools:el('pkt-tools'),mcp:el('pkt-mcp'),sub:el('pkt-sub'),gold:el('pkt-gold')};
+
+var pathCache={};
+function getPath(id){if(!pathCache[id])pathCache[id]=document.getElementById(id);return pathCache[id];}
+function pktOnPath(pkt,pid,t,col){
+  var p=getPath(pid);if(!p||!p.getTotalLength)return;
+  var pt=p.getPointAtLength(clamp(t,0,1)*p.getTotalLength());
+  pkt.setAttribute('cx',pt.x);pkt.setAttribute('cy',pt.y);pkt.setAttribute('fill',col);pkt.setAttribute('opacity','1');
+}
+function hidePkt(pkt){pkt.setAttribute('opacity','0');pkt.setAttribute('cx','-100');pkt.setAttribute('cy','-100');}
+
+function activateNode(g,col,i){
+  if(!g)return;i=i===undefined?1:i;
+  var s=g.querySelector('circle,rect');
+  if(s){s.setAttribute('stroke',col);s.setAttribute('stroke-width',i>0.5?'2.5':'2');s.style.filter=i>0.5?'drop-shadow(0 0 6px '+col+')'  :'';}
+  var t=g.querySelectorAll('text');if(t[0])t[0].setAttribute('fill',i>0.5?col:C.text);
+}
+function dimNode(g){
+  if(!g)return;
+  var s=g.querySelector('circle,rect');
+  if(s){s.setAttribute('stroke',C.dim);s.setAttribute('stroke-width','1.5');s.style.filter='';s.setAttribute('fill','#0b0f1a');}
+  var t=g.querySelectorAll('text');if(t[0])t[0].setAttribute('fill',C.text);if(t[1])t[1].setAttribute('fill',C.dimText);
+}
+function doneNode(g,col){
+  if(!g)return;
+  var s=g.querySelector('circle,rect');
+  if(s){s.setAttribute('stroke',col);s.setAttribute('stroke-width','1.8');s.style.filter='drop-shadow(0 0 4px '+col+'66)';}
+  var t=g.querySelectorAll('text');if(t[0])t[0].setAttribute('fill',col);
+}
+function flowArrow(a,col,off){
+  if(!a)return;
+  a.setAttribute('stroke',col);a.setAttribute('stroke-width','2');
+  a.setAttribute('stroke-dasharray','8 5');a.setAttribute('stroke-dashoffset',String(-off%13));
+}
+function dimArrow(a){if(!a)return;a.setAttribute('stroke',C.dim);a.setAttribute('stroke-width','1.5');a.setAttribute('stroke-dasharray','none');}
+function dimDash(a){if(!a)return;a.setAttribute('stroke',C.dim);a.setAttribute('stroke-width','1.5');}
+
+function setSteps(s0,s1){
+  p0Steps.forEach(function(s,i){s.classList.toggle('active',i===s0);if(i===s0)s.style.setProperty('--ac',C.gold);else s.style.removeProperty('--ac');});
+  p1Steps.forEach(function(s,i){s.classList.toggle('active',i===s1);if(i===s1)s.style.setProperty('--ac',C.agent);else s.style.removeProperty('--ac');});
+}
+
+var lastBanner='';
+function setBanner(txt,col){
+  if(txt===lastBanner)return;lastBanner=txt;
+  bannerEl.style.opacity='0';
+  setTimeout(function(){bannerEl.textContent=txt;bannerEl.style.color=col||C.text;bannerEl.style.opacity='1';},200);
+}
+
+var flashActive={};
+var fApprove=el('flash-approve'),fRefine=el('flash-refine');
+function flash(type,gNode){
+  if(flashActive[type])return;flashActive[type]=true;
+  var ef=type==='approve'?fApprove:fRefine;
+  if(gNode){var c=gNode.querySelector('circle');if(c){var r=c.getBoundingClientRect();ef.style.left=(r.left+r.width/2)+'px';ef.style.top=(r.top+r.height/2)+'px';}}
+  ef.style.opacity='0';var st=null;
+  (function anim(ts){if(!st)st=ts;var p=(ts-st)/1600;if(p>=1){ef.style.opacity='0';flashActive[type]=false;return;}ef.style.opacity=p<0.12?String(p/0.12):p>0.68?String(1-(p-0.68)/0.32):'1';requestAnimationFrame(anim);})(performance.now());
+}
+
+function resetAll(){
+  for(var k in nodes){if(nodes.hasOwnProperty(k))dimNode(nodes[k]);}
+  var dashed=['gateRH','gateDH','gateTH','gateVH','reqSk','reqMcp','reqSub','desSk','desMcp','desSub','tasksSk','tasksSub','execSk','execMcp','execSub','decSeq','decComp','decPcspec','compP1','pcspecP1'];
+  for(var k in arrows){if(!arrows.hasOwnProperty(k))continue;if(dashed.indexOf(k)>=0)dimDash(arrows[k]);else dimArrow(arrows[k]);}
+  for(var k in pkts){if(pkts.hasOwnProperty(k))hidePkt(pkts[k]);}
+}
+
+var startTime=null,arrowOffset=0,prevPhase=null,gateFlashed={},cycleNum=0;
+
+function animate(ts){
+  requestAnimationFrame(animate);
+  if(!startTime)startTime=ts;
+  var elapsed=(ts-startTime)/1000,t=elapsed%CYCLE;
+  cycleNum=Math.floor(elapsed/CYCLE);arrowOffset+=0.14;
+
+  var phase=PHASES[PHASES.length-1];
+  for(var i=0;i<PHASES.length;i++){if(t>=PHASES[i][1]&&t<PHASES[i][2]){phase=PHASES[i];break;}}
+
+  if(phase[0]!==prevPhase){
+    prevPhase=phase[0];
+    if(['gater','gated','gatet','gatev'].indexOf(phase[0])>=0)gateFlashed[phase[0]]=false;
+    resetAll();
+  }
+
+  var id=phase[0],p=norm(t,phase[1],phase[2]),ep=eio(p);
+  setSteps(phase[3][0],phase[3][1]);
+  setBanner(phase[4],phase[5]);
+
+  if(id==='hlr'){
+    activateNode(nodes.hlr,C.gold,ep);
+    flowArrow(arrows.hlrDec,C.gold+'44',arrowOffset);
+    pktOnPath(pkts.gold,'a-hlr-dec',ep*0.5,C.gold);
+
+  }else if(id==='decompose'){
+    doneNode(nodes.hlr,C.gold);activateNode(nodes.decompose,C.gold,ep);
+    flowArrow(arrows.hlrDec,C.gold,arrowOffset);
+    if(ep>0.5){flowArrow(arrows.decComp,C.gold+'88',arrowOffset);flowArrow(arrows.decPcspec,C.gold+'88',arrowOffset);}
+    flowArrow(arrows.decContr,C.gold+'44',arrowOffset);
+    pktOnPath(pkts.gold,'a-hlr-dec',1,C.gold);
+
+  }else if(id==='compmap'){
+    doneNode(nodes.hlr,C.gold);doneNode(nodes.decompose,C.gold);
+    activateNode(nodes.compmap,C.gold,ep);
+    flowArrow(arrows.hlrDec,C.gold,arrowOffset);flowArrow(arrows.decComp,C.gold,arrowOffset);
+    flowArrow(arrows.decContr,C.gold+'44',arrowOffset);
+    if(ep>0.5){flowArrow(arrows.decSeq,C.gold,arrowOffset);activateNode(nodes.seqdiag,C.gold,(ep-0.5)/0.5);}
+    pktOnPath(pkts.gold,'a-dec-comp',ep,C.gold);
+
+  }else if(id==='contracts'){
+    doneNode(nodes.hlr,C.gold);doneNode(nodes.decompose,C.gold);doneNode(nodes.seqdiag,C.gold);doneNode(nodes.compmap,C.gold);    activateNode(nodes.contracts,C.gold,ep);
+    flowArrow(arrows.decContr,C.gold,arrowOffset);
+    pktOnPath(pkts.gold,'a-dec-contr',ep,C.gold);
+
+  }else if(id==='pcspec'){
+    doneNode(nodes.hlr,C.gold);doneNode(nodes.decompose,C.gold);doneNode(nodes.seqdiag,C.gold);
+    doneNode(nodes.compmap,C.gold);doneNode(nodes.contracts,C.gold);
+    activateNode(nodes.pcspec,C.gold,ep);
+    flowArrow(arrows.decPcspec,C.gold,arrowOffset);
+    if(ep>0.5){flowArrow(arrows.compP1,C.gold+'66',arrowOffset);flowArrow(arrows.contrP1,C.gold+'88',arrowOffset);flowArrow(arrows.pcspecP1,C.gold+'66',arrowOffset);}
+    pktOnPath(pkts.gold,'a-dec-pcspec',ep,C.gold);
+
+  }else if(id==='req'){
+    doneNode(nodes.hlr,C.gold);doneNode(nodes.decompose,C.gold);doneNode(nodes.seqdiag,C.gold);
+    doneNode(nodes.compmap,C.gold);doneNode(nodes.contracts,C.gold);doneNode(nodes.pcspec,C.gold);
+    activateNode(nodes.req,C.agent,ep);
+    flowArrow(arrows.contrP1,C.agent,arrowOffset);flowArrow(arrows.reqGater,C.agent+'44',arrowOffset);
+    if(p<0.35){var tp=p/0.35;activateNode(nodes.skills,C.skills,tp);flowArrow(arrows.reqSk,C.skills,arrowOffset*0.6);pktOnPath(pkts.tools,'a-req-sk',eio(tp),C.skills);}
+    else if(p<0.68){doneNode(nodes.skills,C.skills);var tp=(p-0.35)/0.33;activateNode(nodes.mcp,C.mcp,tp);flowArrow(arrows.reqMcp,C.mcp,arrowOffset*0.6);pktOnPath(pkts.mcp,'a-req-mcp',eio(tp),C.mcp);}
+    else{doneNode(nodes.skills,C.skills);doneNode(nodes.mcp,C.mcp);var tp=(p-0.68)/0.32;activateNode(nodes.sub,C.sub,tp);flowArrow(arrows.reqSub,C.sub,arrowOffset*0.6);pktOnPath(pkts.sub,'a-req-sub',eio(tp),C.sub);}
+
+  }else if(id==='gater'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.skills,C.skills);doneNode(nodes.mcp,C.mcp);doneNode(nodes.sub,C.sub);
+    activateNode(nodes.gater,C.human,ep);activateNode(nodes.hrevR,C.human,ep);
+    flowArrow(arrows.reqGater,C.human,arrowOffset);flowArrow(arrows.gateRH,C.human,arrowOffset*0.4);
+    pktOnPath(pkts.human,'a-gate-r-h',ep,C.human);
+    if(ep>0.6&&!gateFlashed['gater']){gateFlashed['gater']=true;flash(cycleNum%3===2?'refine':'approve',nodes.gater);}
+
+  }else if(id==='design'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);
+    activateNode(nodes.des,C.agent,ep);
+    flowArrow(arrows.gaterDes,C.agent,arrowOffset);flowArrow(arrows.desGated,C.agent+'44',arrowOffset);
+    pktOnPath(pkts.main,'a-gater-des',ep,C.agent);
+    if(p<0.35){var tp=p/0.35;activateNode(nodes.skills,C.skills,tp);flowArrow(arrows.desSk,C.skills,arrowOffset*0.6);pktOnPath(pkts.tools,'a-des-sk',eio(tp),C.skills);}
+    else if(p<0.68){doneNode(nodes.skills,C.skills);var tp=(p-0.35)/0.33;activateNode(nodes.mcp,C.mcp,tp);flowArrow(arrows.desMcp,C.mcp,arrowOffset*0.6);pktOnPath(pkts.mcp,'a-des-mcp',eio(tp),C.mcp);}
+    else{doneNode(nodes.skills,C.skills);doneNode(nodes.mcp,C.mcp);var tp=(p-0.68)/0.32;activateNode(nodes.sub,C.sub,tp);flowArrow(arrows.desSub,C.sub,arrowOffset*0.6);pktOnPath(pkts.sub,'a-des-sub',eio(tp),C.sub);}
+
+  }else if(id==='gated'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);doneNode(nodes.des,C.agent);
+    doneNode(nodes.skills,C.skills);doneNode(nodes.mcp,C.mcp);doneNode(nodes.sub,C.sub);
+    activateNode(nodes.gated,C.human,ep);activateNode(nodes.hrevD,C.human,ep);
+    flowArrow(arrows.desGated,C.human,arrowOffset);flowArrow(arrows.gateDH,C.human,arrowOffset*0.4);
+    pktOnPath(pkts.human,'a-gate-d-h',ep,C.human);
+    if(ep>0.6&&!gateFlashed['gated']){gateFlashed['gated']=true;flash(cycleNum%3===1?'refine':'approve',nodes.gated);}
+
+  }else if(id==='tasks'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);
+    doneNode(nodes.des,C.agent);doneNode(nodes.gated,C.human);doneNode(nodes.hrevD,C.human);
+    activateNode(nodes.tasks,C.agent,ep);
+    flowArrow(arrows.gatedTasks,C.agent,arrowOffset);flowArrow(arrows.tasksGatet,C.agent+'44',arrowOffset);
+    pktOnPath(pkts.main,'a-gated-tasks',ep,C.agent);
+    if(p<0.5){var tp=p/0.5;activateNode(nodes.skills,C.skills,tp);flowArrow(arrows.tasksSk,C.skills,arrowOffset*0.6);pktOnPath(pkts.tools,'a-tasks-sk',eio(tp),C.skills);}
+    else{doneNode(nodes.skills,C.skills);var tp=(p-0.5)/0.5;activateNode(nodes.sub,C.sub,tp);flowArrow(arrows.tasksSub,C.sub,arrowOffset*0.6);pktOnPath(pkts.sub,'a-tasks-sub',eio(tp),C.sub);}
+
+  }else if(id==='gatet'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);
+    doneNode(nodes.des,C.agent);doneNode(nodes.gated,C.human);doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.tasks,C.agent);doneNode(nodes.skills,C.skills);doneNode(nodes.sub,C.sub);
+    activateNode(nodes.gatet,C.human,ep);activateNode(nodes.hrevT,C.human,ep);
+    flowArrow(arrows.tasksGatet,C.human,arrowOffset);flowArrow(arrows.gateTH,C.human,arrowOffset*0.4);
+    pktOnPath(pkts.human,'a-gate-t-h',ep,C.human);
+    if(ep>0.6&&!gateFlashed['gatet']){gateFlashed['gatet']=true;flash(cycleNum%4===0?'refine':'approve',nodes.gatet);}
+
+  }else if(id==='execute'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);
+    doneNode(nodes.des,C.agent);doneNode(nodes.gated,C.human);doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.tasks,C.agent);doneNode(nodes.gatet,C.human);doneNode(nodes.hrevT,C.human);
+    activateNode(nodes.exec,C.agent,ep);
+    flowArrow(arrows.gatatExec,C.agent,arrowOffset);flowArrow(arrows.execGatev,C.agent+'44',arrowOffset);
+    pktOnPath(pkts.main,'a-gatet-exec',ep,C.agent);
+    if(p<0.35){var tp=p/0.35;activateNode(nodes.skills,C.skills,tp);flowArrow(arrows.execSk,C.skills,arrowOffset*0.6);pktOnPath(pkts.tools,'a-exec-sk',eio(tp),C.skills);}
+    else if(p<0.68){doneNode(nodes.skills,C.skills);var tp=(p-0.35)/0.33;activateNode(nodes.mcp,C.mcp,tp);flowArrow(arrows.execMcp,C.mcp,arrowOffset*0.6);pktOnPath(pkts.mcp,'a-exec-mcp',eio(tp),C.mcp);}
+    else{doneNode(nodes.skills,C.skills);doneNode(nodes.mcp,C.mcp);var tp=(p-0.68)/0.32;activateNode(nodes.sub,C.sub,tp);flowArrow(arrows.execSub,C.sub,arrowOffset*0.6);pktOnPath(pkts.sub,'a-exec-sub',eio(tp),C.sub);}
+
+  }else if(id==='gatev'){
+    doneNode(nodes.pcspec,C.gold);doneNode(nodes.req,C.agent);doneNode(nodes.gater,C.human);doneNode(nodes.hrevR,C.human);
+    doneNode(nodes.des,C.agent);doneNode(nodes.gated,C.human);doneNode(nodes.hrevD,C.human);
+    doneNode(nodes.tasks,C.agent);doneNode(nodes.gatet,C.human);doneNode(nodes.hrevT,C.human);doneNode(nodes.exec,C.agent);
+    activateNode(nodes.gatev,C.human,ep);activateNode(nodes.hrevV,C.human,ep);
+    flowArrow(arrows.execGatev,C.human,arrowOffset);flowArrow(arrows.gateVH,C.human,arrowOffset*0.4);
+    if(ep>0.5){flowArrow(arrows.gatevDone,C.human+'88',arrowOffset);pktOnPath(pkts.main,'a-gatev-done',(ep-0.5)/0.5,C.approve);}
+    pktOnPath(pkts.human,'a-gate-v-h',ep,C.human);
+    if(ep>0.6&&!gateFlashed['gatev']){gateFlashed['gatev']=true;flash('approve',nodes.gatev);}
+  }
+}
+requestAnimationFrame(animate);
+})();
+</script>
+</body>
+</html>
